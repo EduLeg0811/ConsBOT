@@ -33,7 +33,7 @@ type SourcesResponse = {
 
 // Cache em memória da sessão: alternar os painéis não deve repetir uma
 // consulta já concluída. A atualização explícita continua sendo a fonte de
-// uma nova leitura da OpenAI.
+// uma nova leitura da OpenAI..
 const cachedSourcesByStore = new Map<VectorStoreId, SourcesResponse>();
 let hasInitializedSourcesPanel = false;
 
