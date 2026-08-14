@@ -172,8 +172,8 @@ export type ChatSettings = {
 export const DEFAULT_SETTINGS: ChatSettings = {
   model: "gpt-5.6-terra",
   vectorStoreId: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
-  responseFormat: "chatgpt",
-  systemPrompt: CHATGPT_SYSTEM_PROMPT,
+  responseFormat: "conscienciological",
+  systemPrompt: CONSCIENTIOLOGICAL_SYSTEM_PROMPT,
   reasoningEffort: "none",
   textVerbosity: "low",
   maxOutputTokens: 2048,
@@ -187,92 +187,4 @@ export function normalizeMaxOutputTokens(value: unknown) {
     RESPONSE_LENGTH_VALUES.includes(value as (typeof RESPONSE_LENGTH_VALUES)[number])
     ? value
     : DEFAULT_SETTINGS.maxOutputTokens;
-}
-
-const SETTINGS_KEY = "consbot:settings:v1";
-const MESSAGES_KEY = "consbot:messages:v1";
-
-export function loadSettings(): ChatSettings {
-  if (typeof window === "undefined") return DEFAULT_SETTINGS;
-  try {
-    const raw = window.localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<ChatSettings>;
-    // Se o modelo salvo for legado/antigo, redefinir para o padrão
-    const validModel = MODELS.some((m) => m.id === parsed.model);
-    const validVectorStore = VECTOR_STORES.some((store) => store.id === parsed.vectorStoreId);
-    const validEffort = ["none", "low", "medium", "high", "xhigh", "max"].includes(
-      parsed.reasoningEffort ?? "",
-    );
-    const validResponseFormat = RESPONSE_FORMATS.some(
-      (format) => format.id === parsed.responseFormat,
-    );
-    const maxOutputTokens = normalizeMaxOutputTokens(parsed.maxOutputTokens);
-    const validTextVerbosity = ["low", "medium", "high"].includes(parsed.textVerbosity ?? "");
-
-    return {
-      model: validModel ? (parsed.model as ModelId) : DEFAULT_SETTINGS.model,
-      vectorStoreId: validVectorStore
-        ? (parsed.vectorStoreId as VectorStoreId)
-        : DEFAULT_SETTINGS.vectorStoreId,
-      responseFormat: validResponseFormat
-        ? (parsed.responseFormat as ResponseFormatId)
-        : DEFAULT_SETTINGS.responseFormat,
-      systemPrompt:
-        typeof parsed.systemPrompt === "string"
-          ? parsed.systemPrompt
-          : DEFAULT_SETTINGS.systemPrompt,
-      reasoningEffort: validEffort
-        ? (parsed.reasoningEffort as ChatSettings["reasoningEffort"])
-        : DEFAULT_SETTINGS.reasoningEffort,
-      textVerbosity: validTextVerbosity
-        ? (parsed.textVerbosity as TextVerbosity)
-        : DEFAULT_SETTINGS.textVerbosity,
-      maxOutputTokens,
-    };
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
-}
-
-export function saveSettings(settings: ChatSettings) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-}
-
-export function loadMessages<T>(): T[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(MESSAGES_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveMessages<T>(messages: T[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages));
-}
-
-export function clearMessages() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(MESSAGES_KEY);
-}
-
-/** ID de sessão anônimo e distinto por navegador. */
-export function getSessionId(): string {
-  if (typeof window === "undefined") return "sess-default";
-  const key = "consbot:session-id";
-  let id = window.localStorage.getItem(key);
-  if (!id) {
-    id =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `sess-${Math.random().toString(36).slice(2)}-${Date.now()}`;
-    window.localStorage.setItem(key, id);
-  }
-  return id;
 }

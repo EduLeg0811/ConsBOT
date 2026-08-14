@@ -8,7 +8,6 @@ import { Toaster } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
-  saveSettings,
   systemPromptForFormat,
   type ChatSettings,
   type ResponseFormatId,
@@ -24,7 +23,6 @@ import {
   type AuditLog,
 } from "@/lib/audit-log";
 import {
-  clearAllThreads,
   createThread,
   deleteThread,
   loadThreads,
@@ -36,7 +34,8 @@ import {
 
 const CONTAINER_WIDTHS = ["5xl", "6xl", "7xl", "full"] as const;
 type ContainerWidth = (typeof CONTAINER_WIDTHS)[number];
-const CONTAINER_WIDTH_STORAGE_KEY = "consbot:container-width";
+// Evita duas novas conversas causadas pela dupla inicialização do StrictMode em desenvolvimento.
+let initialSessionThread: ChatThread | null = null;
 
 const CONTAINER_WIDTH_CONFIG: Record<ContainerWidth, { className: string; label: string }> = {
   "5xl": { className: "max-w-5xl", label: "5XL" },
@@ -45,21 +44,16 @@ const CONTAINER_WIDTH_CONFIG: Record<ContainerWidth, { className: string; label:
   full: { className: "max-w-full", label: "Full" },
 };
 
-function loadContainerWidth(): ContainerWidth {
-  if (typeof window === "undefined") return "7xl";
-  const saved = window.localStorage.getItem(CONTAINER_WIDTH_STORAGE_KEY);
-  return CONTAINER_WIDTHS.includes(saved as ContainerWidth) ? (saved as ContainerWidth) : "7xl";
-}
-
 export function ThreadPage() {
-  const [containerWidth, setContainerWidth] = useState<ContainerWidth>(loadContainerWidth);
+  const [containerWidth, setContainerWidth] = useState<ContainerWidth>("7xl");
   const [threads, setThreads] = useState<ChatThread[]>(() => {
-    // Cada abertura começa uma sessão limpa; o histórico anterior nunca é reutilizado.
-    clearAllThreads();
+    // Cada abertura inicia uma conversa nova, mantendo somente a listagem anterior.
     clearAllAuditLogs();
-    const thread = createThread();
-    saveThreads([thread]);
-    return [thread];
+    const thread = initialSessionThread ?? createThread();
+    initialSessionThread = thread;
+    const next = upsertThread(loadThreads(), thread);
+    saveThreads(next);
+    return next;
   });
   const [activeId, setActiveId] = useState<string>(() => threads[0]!.id);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -81,7 +75,6 @@ export function ThreadPage() {
     const currentIndex = CONTAINER_WIDTHS.indexOf(containerWidth);
     const nextWidth = CONTAINER_WIDTHS[(currentIndex + 1) % CONTAINER_WIDTHS.length]!;
     setContainerWidth(nextWidth);
-    window.localStorage.setItem(CONTAINER_WIDTH_STORAGE_KEY, nextWidth);
   };
 
   const handleNew = () => {
@@ -103,7 +96,6 @@ export function ThreadPage() {
   };
 
   const handleClearAll = () => {
-    clearAllThreads();
     const thread = createThread();
     saveThreads([thread]);
     setThreads([thread]);
@@ -117,7 +109,6 @@ export function ThreadPage() {
 
   const handleSettingsChange = (settings: ChatSettings) => {
     if (!active) return;
-    saveSettings(settings);
     persist(upsertThread(threads ?? [], { ...active, settings, updatedAt: active.updatedAt }));
   };
 

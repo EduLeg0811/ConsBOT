@@ -27,8 +27,8 @@ export type AuditDataParts = {
 
 export type ConsBotUIMessage = UIMessage<unknown, AuditDataParts>;
 
-const AUDIT_LOGS_KEY = "consbot:audit-logs:v1";
 const MAX_LOGS_PER_THREAD = 50;
+let sessionLogs: AuditLog[] = [];
 
 export function sanitizeAuditValue(value: unknown): unknown {
   const seen = new WeakSet<object>();
@@ -48,22 +48,12 @@ export function sanitizeAuditValue(value: unknown): unknown {
   return json === undefined ? null : (JSON.parse(json) as unknown);
 }
 
-function isBrowser() {
-  return typeof window !== "undefined";
-}
-
 function readAll(): AuditLog[] {
-  if (!isBrowser()) return [];
-  try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(AUDIT_LOGS_KEY) ?? "[]");
-    return Array.isArray(parsed) ? (parsed as AuditLog[]) : [];
-  } catch {
-    return [];
-  }
+  return sessionLogs;
 }
 
 function writeAll(logs: AuditLog[]) {
-  if (isBrowser()) window.localStorage.setItem(AUDIT_LOGS_KEY, JSON.stringify(logs));
+  sessionLogs = logs;
 }
 
 export function loadAuditLogs(threadId: string): AuditLog[] {
@@ -94,7 +84,6 @@ export function clearAuditLogs(threadId: string) {
 
 /** Os logs são estritamente da sessão atual e não sobrevivem a uma recarga. */
 export function clearAllAuditLogs() {
-  if (!isBrowser()) return;
-  window.localStorage.removeItem(AUDIT_LOGS_KEY);
+  sessionLogs = [];
 }
 import type { UIMessage } from "ai";

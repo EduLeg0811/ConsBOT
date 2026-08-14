@@ -2,7 +2,6 @@ import type { UIMessage } from "ai";
 
 import {
   DEFAULT_SETTINGS,
-  loadSettings,
   MODELS,
   normalizeMaxOutputTokens,
   RESPONSE_FORMATS,
@@ -98,7 +97,7 @@ export function createThread(): ChatThread {
     title: "Nova conversa",
     updatedAt: Date.now(),
     messages: [],
-    settings: loadSettings(),
+    settings: { ...DEFAULT_SETTINGS },
   };
 }
 

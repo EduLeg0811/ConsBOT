@@ -18,7 +18,7 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
-import { getSessionId, MODELS, VECTOR_STORES, type ChatSettings } from "@/lib/chat-settings";
+import { MODELS, VECTOR_STORES, type ChatSettings } from "@/lib/chat-settings";
 import type {
   AuditCompletion,
   AuditLog,
@@ -124,7 +124,7 @@ export function ChatWindow({
 
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
-  const sessionId = useMemo(() => getSessionId(), []);
+  const sessionId = threadId;
   const activeModel = MODELS.find((model) => model.id === settings.model);
   const activeVectorStore = VECTOR_STORES.find((store) => store.id === settings.vectorStoreId);
   const llmParameters = [
