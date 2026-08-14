@@ -34,34 +34,43 @@ function devApiChatPlugin(): Plugin {
               }
               process.env["OPENAI_API_KEY"] = apiKey;
 
-              const abortController = new AbortController();
-              req.once("aborted", () => abortController.abort());
-              const request = new Request(`http://localhost${req.url}`, {
-                method: req.method,
-                headers: { "Content-Type": req.headers["content-type"] ?? "application/json" },
-                ...(isChatRequest || isSuggestionsRequest ? { body: bodyStr } : {}),
-                signal: abortController.signal,
-              });
-              const response = isChatRequest
-                ? await handleChatPost(request)
-                : isSuggestionsRequest
-                  ? await handleSuggestionsPost(request)
-                  : await handleVectorStoreFilesGet(request);
-
-              res.statusCode = response.status;
-              response.headers.forEach((value, key) => {
-                res.setHeader(key, value);
-              });
-
-              if (response.body) {
-                const reader = response.body.getReader();
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  res.write(Buffer.from(value));
+              let parsedBody: unknown = {};
+              if (isChatRequest || isSuggestionsRequest) {
+                try {
+                  parsedBody = bodyStr ? (JSON.parse(bodyStr) as unknown) : {};
+                } catch {
+                  res.statusCode = 400;
+                  res.end("JSON inválido");
+                  return;
                 }
               }
-              res.end();
+              const query = Object.fromEntries(new URL(`http://localhost${req.url}`).searchParams);
+              const apiRequest = { body: parsedBody, query };
+              const handler = isChatRequest
+                ? handleChatPost
+                : isSuggestionsRequest
+                  ? handleSuggestionsPost
+                  : handleVectorStoreFilesGet;
+              const apiResponse = {
+                status(statusCode: number) {
+                  res.statusCode = statusCode;
+                  return apiResponse;
+                },
+                setHeader(name: string, value: string) {
+                  res.setHeader(name, value);
+                },
+                json(value: unknown) {
+                  res.setHeader("Content-Type", "application/json; charset=utf-8");
+                  res.end(JSON.stringify(value));
+                },
+                write(chunk: Uint8Array) {
+                  res.write(Buffer.from(chunk));
+                },
+                end(chunk?: string) {
+                  res.end(chunk);
+                },
+              };
+              await handler(apiRequest, apiResponse);
             } catch (err) {
               console.error("Dev API error:", err);
               res.statusCode = 500;

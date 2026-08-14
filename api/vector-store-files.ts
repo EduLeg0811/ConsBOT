@@ -2,6 +2,14 @@ export const config = {
   runtime: "nodejs",
 };
 
+type VercelRequest = { query?: Record<string, string | string[] | undefined> };
+type VercelResponse = {
+  status: (statusCode: number) => VercelResponse;
+  setHeader: (name: string, value: string) => void;
+  json: (body: unknown) => void;
+  end: () => void;
+};
+
 const VECTOR_STORES = {
   vs_6912908250e4819197e23fe725e04fae: "ALLWV",
   vs_698be4e07c748191b834905ebc7a7da3: "LO",
@@ -42,13 +50,14 @@ function isVectorStoreId(value: string | null): value is VectorStoreId {
 }
 
 async function openAIGet<T>(path: string, apiKey: string, signal: AbortSignal): Promise<T> {
+  const timeoutSignal = AbortSignal.timeout(20_000);
   const response = await fetch(`${OPENAI_API_URL}${path}`, {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "OpenAI-Beta": "assistants=v2",
     },
-    signal,
+    signal: AbortSignal.any([signal, timeoutSignal]),
   });
 
   if (!response.ok) {
@@ -136,40 +145,44 @@ async function addFileNames(files: VectorStoreFile[], apiKey: string, signal: Ab
   return enriched;
 }
 
-export async function GET(request: Request) {
+export async function GET(request: VercelRequest, response: VercelResponse) {
   try {
-    const vectorStoreId = new URL(request.url).searchParams.get("vectorStoreId");
+    const rawVectorStoreId = request.query?.vectorStoreId;
+    const vectorStoreId = typeof rawVectorStoreId === "string" ? rawVectorStoreId : null;
     if (!isVectorStoreId(vectorStoreId)) {
-      return Response.json({ error: "Base vetorial inválida." }, { status: 400 });
+      response.status(400).json({ error: "Base vetorial inválida." });
+      return;
     }
 
     const apiKey = process.env["OPENAI_API_KEY"];
     if (!apiKey) {
-      return Response.json({ error: "OPENAI_API_KEY não configurada." }, { status: 500 });
+      response.status(500).json({ error: "OPENAI_API_KEY não configurada." });
+      return;
     }
+
+    const controller = new AbortController();
 
     const { files, truncated } = await listAllVectorStoreFiles(
       vectorStoreId,
       apiKey,
-      request.signal,
+      controller.signal,
     );
-    const enrichedFiles = await addFileNames(files, apiKey, request.signal);
+    const enrichedFiles = await addFileNames(files, apiKey, controller.signal);
 
-    return Response.json(
-      {
-        vectorStore: { id: vectorStoreId, label: VECTOR_STORES[vectorStoreId] },
-        files: enrichedFiles,
-        truncated,
-      },
-      { headers: { "Cache-Control": "private, no-store" } },
-    );
+    response.setHeader("Cache-Control", "private, no-store");
+    response.status(200).json({
+      vectorStore: { id: vectorStoreId, label: VECTOR_STORES[vectorStoreId] },
+      files: enrichedFiles,
+      truncated,
+    });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      return new Response(null, { status: 499 });
+      response.status(504).json({ error: "A OpenAI demorou demais para responder. Tente atualizar novamente." });
+      return;
     }
     const message = error instanceof Error ? error.message : "Erro ao listar as fontes.";
     console.error("Vector store files API error:", error);
-    return Response.json({ error: message }, { status: 502 });
+    response.status(502).json({ error: message });
   }
 }
 

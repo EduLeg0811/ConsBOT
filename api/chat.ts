@@ -9,6 +9,17 @@ import {
 
 import type { AuditDataParts } from "../src/lib/audit-log.ts";
 
+type VercelRequest = {
+  body?: unknown;
+};
+
+type VercelResponse = {
+  status: (statusCode: number) => VercelResponse;
+  setHeader: (name: string, value: string) => void;
+  write: (chunk: Uint8Array) => void;
+  end: (chunk?: string) => void;
+};
+
 export const config = {
   runtime: "nodejs",
 };
@@ -69,17 +80,19 @@ function toAuditValue(value: unknown): unknown {
   return json === undefined ? null : (JSON.parse(json) as unknown);
 }
 
-export async function POST(request: Request) {
+export async function POST(request: VercelRequest, response: VercelResponse) {
   try {
-    const body = (await request.json()) as ChatRequestBody;
+    const body = (request.body ?? {}) as ChatRequestBody;
 
     if (!Array.isArray(body.messages)) {
-      return new Response("Messages are required", { status: 400 });
+      response.status(400).end("Messages are required");
+      return;
     }
 
     const apiKey = process.env["OPENAI_API_KEY"];
     if (!apiKey) {
-      return new Response("Missing OPENAI_API_KEY in environment variables", { status: 500 });
+      response.status(500).end("Missing OPENAI_API_KEY in environment variables");
+      return;
     }
 
     const modelName =
@@ -154,7 +167,9 @@ export async function POST(request: Request) {
       model: openai.responses(modelName),
       ...(effectiveSystem ? { system: effectiveSystem } : {}),
       messages: modelMessages,
-      abortSignal: request.signal,
+      // O handler do Vercel recebe IncomingMessage, não o Request da Web API.
+      // Mantemos um sinal próprio para que a rota funcione igualmente no deploy.
+      abortSignal: new AbortController().signal,
       ...(maxOutputTokens ? { maxOutputTokens } : {}),
       ...(vectorStoreId
         ? {
@@ -230,14 +245,31 @@ export async function POST(request: Request) {
       },
     });
 
-    return createUIMessageStreamResponse({ stream });
+    const streamedResponse = createUIMessageStreamResponse({ stream });
+    response.status(streamedResponse.status);
+    streamedResponse.headers.forEach((value, key) => response.setHeader(key, value));
+    if (!streamedResponse.body) {
+      response.end();
+      return;
+    }
+    await streamedResponse.body.pipeTo(
+      new WritableStream<Uint8Array>({
+        write(chunk) {
+          response.write(chunk);
+        },
+        close() {
+          response.end();
+        },
+      }),
+    );
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      return new Response("Cancelado", { status: 499 });
+      response.status(499).end("Cancelado");
+      return;
     }
     const message = error instanceof Error ? error.message : "Erro desconhecido";
     console.error("Chat API error:", error);
-    return new Response(message, { status: 500 });
+    response.status(500).end(message);
   }
 }
 

@@ -2,6 +2,9 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
 
+type VercelRequest = { body?: unknown };
+type VercelResponse = { status: (statusCode: number) => VercelResponse; json: (body: unknown) => void };
+
 export const config = {
   runtime: "nodejs",
 };
@@ -25,17 +28,15 @@ function toSafeAuditValue(value: unknown): unknown {
   return json === undefined ? null : (JSON.parse(json) as unknown);
 }
 
-export async function POST(request: Request) {
+export async function POST(request: VercelRequest, response: VercelResponse) {
   try {
     const apiKey = process.env["OPENAI_API_KEY"];
     if (!apiKey) {
-      return Response.json(
-        { error: "Missing OPENAI_API_KEY in environment variables" },
-        { status: 500 },
-      );
+      response.status(500).json({ error: "Missing OPENAI_API_KEY in environment variables" });
+      return;
     }
 
-    const body = (await request.json().catch(() => ({}))) as { sessionId?: unknown };
+    const body = (request.body ?? {}) as { sessionId?: unknown };
     const sessionId =
       typeof body.sessionId === "string" && body.sessionId.length > 0
         ? body.sessionId.slice(0, 64)
@@ -88,10 +89,11 @@ export async function POST(request: Request) {
     // O schema já valida cada pergunta. Não descartamos sugestões utilizáveis
     // apenas porque o modelo retornou menos de oito itens em uma chamada.
     if (result.object.length === 0) {
-      return Response.json({ error: "A LLM não retornou perguntas sugeridas." }, { status: 502 });
+      response.status(502).json({ error: "A LLM não retornou perguntas sugeridas." });
+      return;
     }
 
-    return Response.json({
+    response.status(200).json({
       suggestions: result.object,
       audit: {
         request: toSafeAuditValue({ calls: capturedRequests }),
@@ -109,10 +111,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao gerar perguntas iniciais.";
     console.error("Suggestions API error:", error);
-    return Response.json(
-      { error: message.replace(/sk-[A-Za-z0-9_-]+/g, "[chave removida]") },
-      { status: 500 },
-    );
+    response.status(500).json({ error: message.replace(/sk-[A-Za-z0-9_-]+/g, "[chave removida]") });
   }
 }
 
