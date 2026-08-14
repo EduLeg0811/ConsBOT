@@ -114,13 +114,13 @@ export function ChatSidebarContent({
               id: "settings" as const,
               label: "Config",
               icon: Settings2,
-              description: "Ajuste modelo, raciocínio, tamanho, formato e prompt.",
+              description: "Ajuste modelo e parâmetros.",
             },
             {
               id: "sources" as const,
               label: "Fontes",
               icon: Database,
-              description: "Selecione a base de dados e consulte seus arquivos.",
+              description: "Selecione a base de dados dos arquivos.",
             },
             {
               id: "logs" as const,
@@ -141,7 +141,7 @@ export function ChatSidebarContent({
                       className={cn(
                         "flex-1 gap-2 rounded-full border border-transparent transition-colors hover:bg-slate-200 hover:text-slate-800",
                         selected &&
-                          "font-bold text-emerald-600 hover:bg-slate-200 hover:text-emerald-700",
+                        "font-bold text-emerald-600 hover:bg-slate-200 hover:text-emerald-700",
                       )}
                       onClick={() => setTab(id)}
                       aria-label={label === "Fontes" ? "Fontes de consulta" : label}

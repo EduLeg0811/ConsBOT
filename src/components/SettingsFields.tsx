@@ -117,7 +117,7 @@ export function SettingsFields({ value: draft, onChange: setDraft }: Props) {
           </SelectContent>
         </Select>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Orienta o nível de detalhe do texto; o limite de tokens continua sendo aplicado separadamente.
+          Nível de detalhe do texto.
         </p>
       </div>
 
@@ -152,7 +152,7 @@ export function SettingsFields({ value: draft, onChange: setDraft }: Props) {
           })}
         </div>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          A seleção substitui o prompt de sistema pelo formato correspondente.
+          Prompt de sistema.
         </p>
       </div>
 

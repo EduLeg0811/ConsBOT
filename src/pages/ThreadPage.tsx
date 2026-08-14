@@ -191,9 +191,8 @@ export function ThreadPage() {
                   },
                   {
                     id: "conscienciological",
-                    label: "Confor conscienciológico",
-                    description:
-                      "Resposta estruturada, com terminologia e fontes da Conscienciologia.",
+                    label: "Confor Conscienciológico",
+                    description: "Resposta estruturada no confor da Conscienciologia.",
                   },
                 ].map((format) => {
                   const selected = active.settings.responseFormat === format.id;

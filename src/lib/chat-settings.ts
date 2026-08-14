@@ -2,17 +2,17 @@ export const MODELS = [
   {
     id: "gpt-5.6-luna",
     label: "ConsBOT Luna",
-    description: "Rápido e econômico para conversas do dia a dia.",
+    description: "Rápido para conversas do dia a dia.",
   },
   {
     id: "gpt-5.6-terra",
     label: "ConsBOT Terra",
-    description: "Equilíbrio entre alta qualidade, velocidade e precisão.",
+    description: "Equilíbrio entre alta qualidade e velocidade.",
   },
   {
     id: "gpt-5.6-sol",
     label: "ConsBOT Sol",
-    description: "Raciocínio avançado para tarefas lógicas e complexas.",
+    description: "Raciocínio avançado para tarefas complexas.",
   },
 ] as const;
 
@@ -58,7 +58,7 @@ export const RESPONSE_FORMATS = [
   {
     id: "conscienciological",
     label: "Conscienciológico",
-    description: "Confor conscienciológico",
+    description: "Confor Conscienciológico",
   },
 ] as const;
 

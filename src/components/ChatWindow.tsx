@@ -131,7 +131,7 @@ export function ChatWindow({
     ({ low: "Verb. baixa", medium: "Verb. média", high: "Verb. alta" })[settings.textVerbosity],
     `${settings.maxOutputTokens} tokens`,
     settings.vectorStoreId === "none" ? "Sem RAG" : activeVectorStore?.label,
-    settings.responseFormat === "conscienciological" ? "Confor conscienciológico" : "Modo livre",
+    settings.responseFormat === "conscienciological" ? "Confor Conscienciológico" : "Modo livre",
   ].filter((parameter): parameter is string => Boolean(parameter));
 
   const transport = useMemo(
