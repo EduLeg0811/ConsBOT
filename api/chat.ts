@@ -54,6 +54,7 @@ type ChatRequestBody = {
   vectorStoreId?: unknown;
   systemPrompt?: unknown;
   reasoningEffort?: unknown;
+  textVerbosity?: unknown;
   maxOutputTokens?: unknown;
   responseFormat?: unknown;
 };
@@ -105,6 +106,11 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       (EFFORTS as readonly string[]).includes(body.reasoningEffort)
         ? body.reasoningEffort
         : "none";
+
+    const textVerbosity =
+      typeof body.textVerbosity === "string" && ["low", "medium", "high"].includes(body.textVerbosity)
+        ? body.textVerbosity
+        : "low";
 
     const vectorStoreId =
       typeof body.vectorStoreId === "string" &&
@@ -182,6 +188,7 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       providerOptions: {
         openai: {
           reasoningEffort: effort,
+          textVerbosity,
           reasoningSummary: null,
           reasoningContext: "all_turns",
           store: true,

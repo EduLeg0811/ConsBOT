@@ -100,6 +100,28 @@ export function SettingsFields({ value: draft, onChange: setDraft }: Props) {
       </div>
 
       <div className="space-y-2">
+        <Label>Verbosidade da resposta</Label>
+        <Select
+          value={draft.textVerbosity}
+          onValueChange={(value) =>
+            setDraft({ ...draft, textVerbosity: value as ChatSettings["textVerbosity"] })
+          }
+        >
+          <SelectTrigger className="text-xs bg-white/90 shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="text-xs">
+            <SelectItem className="text-xs" value="low">Baixa — mais concisa</SelectItem>
+            <SelectItem className="text-xs" value="medium">Média — equilibrada</SelectItem>
+            <SelectItem className="text-xs" value="high">Alta — mais detalhada</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Orienta o nível de detalhe do texto; o limite de tokens continua sendo aplicado separadamente.
+        </p>
+      </div>
+
+      <div className="space-y-2">
         <Label>Formato da resposta</Label>
         <div className="grid grid-cols-2 gap-2">
           {RESPONSE_FORMATS.map((format) => {

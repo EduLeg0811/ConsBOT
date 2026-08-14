@@ -4,13 +4,6 @@ import { toast } from "sonner";
 
 import { ChatSidebar, ChatSidebarSheet } from "@/components/ChatSidebar";
 import { ChatWindow } from "@/components/ChatWindow";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Toaster } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -39,14 +32,6 @@ import {
   upsertThread,
   type ChatThread,
 } from "@/lib/chat-store";
-
-const RESPONSE_LENGTH_OPTIONS = [
-  { label: "Síntese", value: 256 },
-  { label: "Breve", value: 512 },
-  { label: "Longa", value: 1024 },
-  { label: "Extensa", value: 2048 },
-  { label: "Livre", value: 4096 },
-] as const;
 
 export function ThreadPage() {
   const { threadId } = useParams<{ threadId: string }>();
@@ -247,31 +232,6 @@ export function ThreadPage() {
                 })}
               </div>
             </TooltipProvider>
-
-            <Select
-              value={String(active.settings.maxOutputTokens)}
-              onValueChange={(value) =>
-                handleSettingsChange({ ...active.settings, maxOutputTokens: Number(value) })
-              }
-            >
-              <SelectTrigger
-                aria-label="Tamanho máximo da resposta"
-                className="h-8 w-28 border-border/80 bg-slate-50 px-2.5 text-[11px] font-medium text-slate-600 shadow-[0_1px_4px_-3px_rgba(71,85,105,0.45)] hover:bg-slate-100"
-              >
-                <SelectValue placeholder="Tamanho da resposta" />
-              </SelectTrigger>
-              <SelectContent className="border-border/80 bg-slate-50 text-xs">
-                {RESPONSE_LENGTH_OPTIONS.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={String(option.value)}
-                    className="text-xs focus:bg-slate-100 focus:text-slate-700"
-                  >
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </header>
 

@@ -63,6 +63,7 @@ export const RESPONSE_FORMATS = [
 ] as const;
 
 export type ResponseFormatId = (typeof RESPONSE_FORMATS)[number]["id"];
+export type TextVerbosity = "low" | "medium" | "high";
 
 export const CHATGPT_SYSTEM_PROMPT =
   "Você é o ConsBOT, um assistente atencioso, claro e objetivo. Responda sempre no idioma do usuário, use markdown quando ajudar e admita quando não souber algo.";
@@ -158,6 +159,7 @@ export type ChatSettings = {
   responseFormat: ResponseFormatId;
   systemPrompt: string;
   reasoningEffort: "none" | "low" | "medium" | "high" | "xhigh" | "max";
+  textVerbosity: TextVerbosity;
   maxOutputTokens: number;
 };
 
@@ -167,7 +169,8 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   responseFormat: "chatgpt",
   systemPrompt: CHATGPT_SYSTEM_PROMPT,
   reasoningEffort: "none",
-  maxOutputTokens: 1024,
+  textVerbosity: "low",
+  maxOutputTokens: 2048,
 };
 
 export const RESPONSE_LENGTH_VALUES = [256, 512, 1024, 2048, 4096] as const;
@@ -199,6 +202,7 @@ export function loadSettings(): ChatSettings {
       (format) => format.id === parsed.responseFormat,
     );
     const maxOutputTokens = normalizeMaxOutputTokens(parsed.maxOutputTokens);
+    const validTextVerbosity = ["low", "medium", "high"].includes(parsed.textVerbosity ?? "");
 
     return {
       model: validModel ? (parsed.model as ModelId) : DEFAULT_SETTINGS.model,
@@ -215,6 +219,9 @@ export function loadSettings(): ChatSettings {
       reasoningEffort: validEffort
         ? (parsed.reasoningEffort as ChatSettings["reasoningEffort"])
         : DEFAULT_SETTINGS.reasoningEffort,
+      textVerbosity: validTextVerbosity
+        ? (parsed.textVerbosity as TextVerbosity)
+        : DEFAULT_SETTINGS.textVerbosity,
       maxOutputTokens,
     };
   } catch {

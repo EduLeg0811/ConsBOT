@@ -54,19 +54,19 @@ function getRagStatus(
 
   const resultCount =
     fileSearchPart.state === "output-available" &&
-    fileSearchPart.output &&
-    typeof fileSearchPart.output === "object" &&
-    "results" in fileSearchPart.output &&
-    Array.isArray(fileSearchPart.output.results)
+      fileSearchPart.output &&
+      typeof fileSearchPart.output === "object" &&
+      "results" in fileSearchPart.output &&
+      Array.isArray(fileSearchPart.output.results)
       ? fileSearchPart.output.results.length
       : null;
 
   const metadata = userMessage.metadata;
   const vectorStoreId =
     metadata &&
-    typeof metadata === "object" &&
-    "ragVectorStoreId" in metadata &&
-    typeof metadata.ragVectorStoreId === "string"
+      typeof metadata === "object" &&
+      "ragVectorStoreId" in metadata &&
+      typeof metadata.ragVectorStoreId === "string"
       ? metadata.ragVectorStoreId
       : fallbackVectorStoreId;
   const vectorStoreLabel = VECTOR_STORES.find((store) => store.id === vectorStoreId)?.label;
@@ -128,6 +128,7 @@ export function ChatWindow({
   const llmParameters = [
     `GPT-5.6 ${activeModel?.label.replace("ConsBOT ", "") ?? "Terra"}`,
     REASONING_LABELS[settings.reasoningEffort],
+    ({ low: "Verb. baixa", medium: "Verb. média", high: "Verb. alta" })[settings.textVerbosity],
     `${settings.maxOutputTokens} tokens`,
     settings.vectorStoreId === "none" ? "Sem RAG" : activeVectorStore?.label,
     settings.responseFormat === "conscienciological" ? "Confor conscienciológico" : "Modo livre",
@@ -147,6 +148,7 @@ export function ChatWindow({
             systemPrompt: settingsRef.current.systemPrompt,
             responseFormat: settingsRef.current.responseFormat,
             reasoningEffort: settingsRef.current.reasoningEffort,
+            textVerbosity: settingsRef.current.textVerbosity,
             maxOutputTokens: settingsRef.current.maxOutputTokens,
           },
         }),
@@ -232,6 +234,7 @@ export function ChatWindow({
           systemPrompt: settingsRef.current.systemPrompt,
           responseFormat: settingsRef.current.responseFormat,
           reasoningEffort: settingsRef.current.reasoningEffort,
+          textVerbosity: settingsRef.current.textVerbosity,
           maxOutputTokens: settingsRef.current.maxOutputTokens,
         },
       });
@@ -315,6 +318,7 @@ export function ChatWindow({
         systemPrompt: settingsRef.current.systemPrompt,
         responseFormat: settingsRef.current.responseFormat,
         reasoningEffort: settingsRef.current.reasoningEffort,
+        textVerbosity: settingsRef.current.textVerbosity,
         maxOutputTokens: settingsRef.current.maxOutputTokens,
       },
     });
@@ -384,7 +388,7 @@ export function ChatWindow({
                   />
                 }
                 title="Olá Conscienciólogo!"
-                description="O que gostaria de conversar hoje?"
+                description="O que você gostaria de conversar hoje?"
                 descriptionClassName="text-[#8a8a8a] italic"
               />
               <div className="-mb-3 flex w-full justify-end">
@@ -450,12 +454,17 @@ export function ChatWindow({
                       if (part.type === "text") {
                         const text =
                           message.role === "assistant" &&
-                          settings.responseFormat === "conscienciological"
+                            settings.responseFormat === "conscienciological"
                             ? normalizeConscienciologicalLists(part.text)
                             : part.text;
 
                         return (
-                          <MessageResponse key={`${message.id}-t-${index}`}>{text}</MessageResponse>
+                          <MessageResponse
+                            key={`${message.id}-t-${index}`}
+                            responseFormat={settings.responseFormat}
+                          >
+                            {text}
+                          </MessageResponse>
                         );
                       }
                       if (part.type === "tool-fileSearch") {
