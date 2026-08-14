@@ -8,8 +8,8 @@ import {
 } from "ai";
 
 import type { AuditDataParts } from "../src/lib/audit-log.ts";
-import { getAccessLevel } from "./access-level.ts";
-import { enforceModelRateLimit } from "./rate-limit.ts";
+import { getAccessLevel } from "./access-level.js";
+import { enforceModelRateLimit } from "./rate-limit.js";
 
 type VercelRequest = {
   body?: unknown;
