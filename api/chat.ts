@@ -167,9 +167,10 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
         ? Math.min(Math.round(body.maxOutputTokens), 32000)
         : DEFAULT_MAX_OUTPUT_TOKENS;
 
-    const isConscienciologicalFormat = isAdmin
-      ? body.responseFormat === "conscienciological"
-      : DEFAULT_RESPONSE_FORMAT === "conscienciological";
+    const isConscienciologicalFormat =
+      typeof body.responseFormat === "string"
+        ? body.responseFormat === "conscienciological"
+        : DEFAULT_RESPONSE_FORMAT === "conscienciological";
     const responseLengthGuidance = maxOutputTokens
       ? RESPONSE_LENGTH_GUIDANCE[maxOutputTokens]
       : undefined;

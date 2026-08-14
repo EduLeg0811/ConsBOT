@@ -96,7 +96,15 @@ export function ThreadPage() {
 
   const active = threads.find((thread) => thread.id === activeId) ?? null;
   const isAdmin = accessLevel === 1;
-  const effectiveSettings = isAdmin && active ? active.settings : DEFAULT_SETTINGS;
+  const effectiveSettings = active
+    ? isAdmin
+      ? active.settings
+      : {
+          ...DEFAULT_SETTINGS,
+          responseFormat: active.settings.responseFormat,
+          systemPrompt: active.settings.systemPrompt,
+        }
+    : DEFAULT_SETTINGS;
 
   const goTo = (id: string) => setActiveId(id);
 
@@ -146,9 +154,15 @@ export function ThreadPage() {
   };
 
   const handleSettingsChange = (settings: ChatSettings) => {
-    if (!isAdmin) return;
     if (!active) return;
-    persist(upsertThread(threads ?? [], { ...active, settings, updatedAt: active.updatedAt }));
+    const nextSettings = isAdmin
+      ? settings
+      : {
+          ...DEFAULT_SETTINGS,
+          responseFormat: settings.responseFormat,
+          systemPrompt: settings.systemPrompt,
+        };
+    persist(upsertThread(threads ?? [], { ...active, settings: nextSettings, updatedAt: active.updatedAt }));
   };
 
   const handleAuditStart = useCallback(
@@ -247,7 +261,7 @@ export function ThreadPage() {
             </div>
             <div className="order-3 flex w-full flex-wrap items-center justify-end gap-2 lg:order-none lg:ml-auto lg:w-auto lg:flex-nowrap">
             <TooltipProvider delayDuration={250}>
-              {isAdmin ? <div className="flex items-center gap-1" aria-label="Formato da resposta">
+              <div className="flex items-center gap-1" aria-label="Formato da resposta">
                 {[
                   {
                     id: "chatgpt",
@@ -289,7 +303,7 @@ export function ThreadPage() {
                     </Tooltip>
                   );
                 })}
-              </div> : null}
+              </div>
             </TooltipProvider>
               <button
                 type="button"
