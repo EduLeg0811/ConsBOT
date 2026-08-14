@@ -31,7 +31,10 @@ type SourcesResponse = {
   error?: string;
 };
 
-let cachedSources: SourcesResponse | null = null;
+// Cache em memória da sessão: alternar os painéis não deve repetir uma
+// consulta já concluída. A atualização explícita continua sendo a fonte de
+// uma nova leitura da OpenAI.
+const cachedSourcesByStore = new Map<VectorStoreId, SourcesResponse>();
 let hasInitializedSourcesPanel = false;
 
 function formatBytes(bytes: number | null) {
@@ -70,13 +73,18 @@ export function VectorStoreSources({
   vectorStoreId: VectorStoreId;
   onVectorStoreChange: (vectorStoreId: VectorStoreId) => void;
 }) {
-  const [data, setData] = useState<SourcesResponse | null>(() => cachedSources);
+  const [data, setData] = useState<SourcesResponse | null>(() =>
+    cachedSourcesByStore.get(vectorStoreId) ?? null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasPendingSelection, setHasPendingSelection] = useState(false);
   const [request, setRequest] = useState<{ vectorStoreId: VectorStoreId; refreshKey: number }>(
     () => ({
-      vectorStoreId: hasInitializedSourcesPanel ? "none" : vectorStoreId,
+      vectorStoreId:
+        hasInitializedSourcesPanel || cachedSourcesByStore.has(vectorStoreId)
+          ? "none"
+          : vectorStoreId,
       refreshKey: 0,
     }),
   );
@@ -91,10 +99,15 @@ export function VectorStoreSources({
 
   const handleVectorStoreChange = useCallback(
     (nextVectorStoreId: VectorStoreId) => {
-      setHasPendingSelection(nextVectorStoreId !== vectorStoreId);
+      const cached = cachedSourcesByStore.get(nextVectorStoreId) ?? null;
+      // Uma base já carregada pode ser exibida imediatamente; apenas uma
+      // base sem cache precisa aguardar o refresh solicitado pelo usuário.
+      setData(cached);
+      setError(null);
+      setHasPendingSelection(nextVectorStoreId !== "none" && cached === null);
       onVectorStoreChange(nextVectorStoreId);
     },
-    [onVectorStoreChange, vectorStoreId],
+    [onVectorStoreChange],
   );
 
   useEffect(() => {
@@ -121,7 +134,7 @@ export function VectorStoreSources({
       .then(async (response) => {
         const body = (await response.json()) as SourcesResponse;
         if (!response.ok) throw new Error(body.error || "Não foi possível carregar as fontes.");
-        cachedSources = body;
+        cachedSourcesByStore.set(requestedStoreId, body);
         setData(body);
       })
       .catch((reason: unknown) => {

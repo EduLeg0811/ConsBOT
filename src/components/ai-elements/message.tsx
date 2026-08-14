@@ -279,7 +279,7 @@ export const MessageResponse = memo(
   ({ className, responseFormat = "chatgpt", ...props }: MessageResponseProps) => (
     <Streamdown
       className={cn(
-        "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>ul]:!list-decimal [&>ol]:!list-decimal [&>ul>li]:!py-0 [&>ol>li]:!py-0",
+        "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>p]:mb-2 [&>ul]:!list-decimal [&>ol]:!list-decimal [&>ul>li]:!py-0 [&>ol>li]:!py-0",
         responseFormat === "chatgpt"
           ? "[&>h1]:mt-8 [&>h1]:mb-3 [&>h1]:text-lg [&>h1]:font-semibold [&>h1]:text-[#244d78] [&>h2]:mt-7 [&>h2]:mb-2.5 [&>h2]:text-base [&>h2]:font-semibold [&>h2]:text-[#2d5b87] [&>h3]:mt-6 [&>h3]:mb-2 [&>h3]:text-[0.95rem] [&>h3]:font-semibold [&>h3]:text-[#3a668f] [&>h1:first-child]:mt-0 [&>h2:first-child]:mt-0 [&>h3:first-child]:mt-0"
           : "[&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:text-[1.05rem] [&>h1]:font-semibold [&>h1]:text-[#173a5e] [&>h1:first-child]:mt-0",
