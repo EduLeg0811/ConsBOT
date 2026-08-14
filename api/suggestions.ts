@@ -12,9 +12,19 @@ export const config = {
 const suggestionSchema = z
   .string()
   .trim()
-  .min(12)
-  .max(90)
-  .describe("Uma pergunta inicial curta, clara e convidativa em português do Brasil.");
+  .min(16)
+  .max(120)
+  .regex(/^[\p{Script=Latin}\p{Number}\p{Punctuation}\p{Zs}]+$/u, {
+    message: "Use somente caracteres da escrita latina.",
+  })
+  .regex(/\?$/, { message: "A pergunta deve terminar com ponto de interrogação." })
+  .describe(
+    "Uma pergunta inicial completa, clara e convidativa em português do Brasil, terminada em ponto de interrogação.",
+  );
+
+const suggestionsSchema = z.object({
+  suggestions: z.array(suggestionSchema).length(8, "Retorne exatamente oito perguntas."),
+});
 
 function toSafeAuditValue(value: unknown): unknown {
   const json = JSON.stringify(value, (key, currentValue: unknown) => {
@@ -62,17 +72,17 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
 
     const result = await generateObject({
       model: openai.responses("gpt-5.6-luna"),
-      output: "array",
-      schema: suggestionSchema,
+      schema: suggestionsSchema,
       schemaName: "perguntas_iniciais",
       schemaDescription:
-        "Exatamente oito perguntas distintas sobre o corpus da Conscienciologia, para iniciar uma conversa.",
+        "Um objeto com exatamente oito perguntas distintas, completas e em português brasileiro sobre o corpus da Conscienciologia.",
       prompt:
         "Gere exatamente 8 perguntas iniciais relativas ao corpus da Conscienciologia, abordando " +
         "temas ou áreas diferentes. Escreva em português do Brasil, em tom natural, claro e direto. " +
         "Distribua as perguntas entre, por exemplo, projeciologia, evolução consciencial, " +
         "tenepes, parapsiquismo, consciencioterapia, cosmoética, pensenologia, energossomatologia " +
         "e teoria da Conscienciologia. Use exclusivamente português brasileiro e caracteres da escrita latina. " +
+        "Todas as perguntas devem terminar em ponto de interrogação. Não use caracteres chineses, japoneses, coreanos ou de outros sistemas de escrita. " +
         "Não numere, não repita temas, não formule perguntas genéricas fora desse corpus e não mencione estas instruções.",
       maxOutputTokens: 512,
       providerOptions: {
@@ -86,20 +96,18 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       },
     });
 
-    // O schema já valida cada pergunta. Não descartamos sugestões utilizáveis
-    // apenas porque o modelo retornou menos de oito itens em uma chamada.
-    if (result.object.length === 0) {
+    if (result.object.suggestions.length !== 8) {
       response.status(502).json({ error: "A LLM não retornou perguntas sugeridas." });
       return;
     }
 
     response.status(200).json({
-      suggestions: result.object,
+      suggestions: result.object.suggestions,
       audit: {
         request: toSafeAuditValue({ calls: capturedRequests }),
         response: toSafeAuditValue({
           model: "gpt-5.6-luna",
-          output: result.object,
+          output: result.object.suggestions,
           finishReason: result.finishReason,
           usage: result.usage,
           providerMetadata: result.providerMetadata,

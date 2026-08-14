@@ -41,6 +41,18 @@ type SuggestionsResponse = {
   error?: string;
 };
 
+function isCompletePortugueseSuggestion(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const suggestion = value.trim();
+
+  return (
+    suggestion.length >= 16 &&
+    suggestion.length <= 120 &&
+    suggestion.endsWith("?") &&
+    /^[\p{Script=Latin}\p{Number}\p{Punctuation}\p{Zs}]+$/u.test(suggestion)
+  );
+}
+
 function getRagStatus(
   userMessage: ConsBotUIMessage,
   assistantMessage: ConsBotUIMessage | undefined,
@@ -292,14 +304,17 @@ export function ChatWindow({
       });
       const result = (await response.json()) as SuggestionsResponse;
       if (!response.ok) throw new Error(result.error || "Não foi possível gerar novas perguntas.");
-      if (!Array.isArray(result.suggestions) || result.suggestions.length === 0) {
-        throw new Error("A LLM não retornou perguntas sugeridas.");
+      const completeSuggestions = Array.isArray(result.suggestions)
+        ? result.suggestions.filter(isCompletePortugueseSuggestion)
+        : [];
+      if (completeSuggestions.length !== 8) {
+        throw new Error("A LLM não retornou oito perguntas completas em português brasileiro.");
       }
-      setSuggestions(result.suggestions);
+      setSuggestions(completeSuggestions);
       onAuditComplete(auditId, {
         openaiRequest: result.audit?.request,
         response: result.audit?.response ?? result,
-        uiResponse: result.suggestions,
+        uiResponse: completeSuggestions,
       });
     } catch (error) {
       const message =
