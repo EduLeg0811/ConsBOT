@@ -43,6 +43,10 @@ type OpenAIFile = {
   created_at: number;
 };
 
+type OpenAIVectorStore = {
+  file_counts?: { total?: number };
+};
+
 const OPENAI_API_URL = "https://api.openai.com/v1";
 const MAX_FILES = 1000;
 
@@ -163,6 +167,23 @@ export async function GET(request: VercelRequest, response: VercelResponse) {
 
     const controller = new AbortController();
 
+    const summaryOnly = request.query?.summary === "1";
+    const vectorStore = await openAIGet<OpenAIVectorStore>(
+      `/vector_stores/${encodeURIComponent(vectorStoreId)}`,
+      apiKey,
+      controller.signal,
+    );
+    const totalFiles = vectorStore.file_counts?.total ?? 0;
+
+    if (summaryOnly) {
+      response.setHeader("Cache-Control", "private, no-store");
+      response.status(200).json({
+        vectorStore: { id: vectorStoreId, label: VECTOR_STORES[vectorStoreId] },
+        totalFiles,
+      });
+      return;
+    }
+
     const { files, truncated } = await listAllVectorStoreFiles(
       vectorStoreId,
       apiKey,
@@ -173,6 +194,7 @@ export async function GET(request: VercelRequest, response: VercelResponse) {
     response.setHeader("Cache-Control", "private, no-store");
     response.status(200).json({
       vectorStore: { id: vectorStoreId, label: VECTOR_STORES[vectorStoreId] },
+      totalFiles,
       files: enrichedFiles,
       truncated,
     });

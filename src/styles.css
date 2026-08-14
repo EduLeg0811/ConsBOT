@@ -89,13 +89,13 @@
   --chart-3: oklch(0.86 0.09 95);
   --chart-4: oklch(0.83 0.07 320);
   --chart-5: oklch(0.8 0.08 45);
-  --sidebar: oklch(0.985 0.012 145);
-  --sidebar-foreground: oklch(0.3 0.035 155);
+  --sidebar: oklch(0.975 0.003 155);
+  --sidebar-foreground: oklch(0.3 0.012 245);
   --sidebar-primary: oklch(0.72 0.09 150);
   --sidebar-primary-foreground: oklch(0.22 0.03 155);
-  --sidebar-accent: oklch(0.93 0.035 145);
-  --sidebar-accent-foreground: oklch(0.3 0.035 155);
-  --sidebar-border: oklch(0.9 0.025 148);
+  --sidebar-accent: oklch(0.955 0.005 155);
+  --sidebar-accent-foreground: oklch(0.3 0.012 245);
+  --sidebar-border: oklch(0.895 0.004 155);
   --sidebar-ring: oklch(0.72 0.09 150);
   --chat-user: oklch(0.86 0.06 150);
   --chat-user-foreground: oklch(0.25 0.035 155);
@@ -110,38 +110,55 @@
 }
 
 .dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  --background: oklch(0.19 0.018 165);
+  --foreground: oklch(0.94 0.012 155);
+  --card: oklch(0.235 0.02 165);
+  --card-foreground: oklch(0.94 0.012 155);
+  --popover: oklch(0.255 0.022 165);
+  --popover-foreground: oklch(0.94 0.012 155);
+  --primary: oklch(0.76 0.11 155);
+  --primary-foreground: oklch(0.18 0.025 165);
+  --secondary: oklch(0.29 0.022 165);
+  --secondary-foreground: oklch(0.93 0.012 155);
+  --muted: oklch(0.275 0.017 165);
+  --muted-foreground: oklch(0.72 0.018 155);
+  --accent: oklch(0.32 0.035 165);
+  --accent-foreground: oklch(0.96 0.012 155);
+  --destructive: oklch(0.7 0.16 28);
+  --destructive-foreground: oklch(0.98 0.005 60);
+  --border: oklch(0.4 0.018 165 / 0.72);
+  --input: oklch(0.37 0.018 165);
+  --ring: oklch(0.76 0.11 155);
+  --chart-1: oklch(0.76 0.11 155);
+  --chart-2: oklch(0.73 0.09 205);
+  --chart-3: oklch(0.79 0.1 95);
+  --chart-4: oklch(0.73 0.09 330);
+  --chart-5: oklch(0.76 0.1 45);
+  --sidebar: oklch(0.215 0.016 165);
+  --sidebar-foreground: oklch(0.94 0.012 155);
+  --sidebar-primary: oklch(0.76 0.11 155);
+  --sidebar-primary-foreground: oklch(0.18 0.025 165);
+  --sidebar-accent: oklch(0.3 0.024 165);
+  --sidebar-accent-foreground: oklch(0.95 0.012 155);
+  --sidebar-border: oklch(0.4 0.018 165 / 0.72);
+  --sidebar-ring: oklch(0.76 0.11 155);
+  --chat-user: oklch(0.39 0.075 155);
+  --chat-user-foreground: oklch(0.96 0.012 155);
+  --gradient-surface: linear-gradient(170deg, oklch(0.235 0.02 165), oklch(0.21 0.022 195));
+  --gradient-brand: linear-gradient(120deg, oklch(0.69 0.11 155), oklch(0.7 0.09 205));
+  --shadow-soft: 0 12px 32px -18px oklch(0.04 0.01 165 / 0.72);
+}
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+.message-response-conscienciological > h1 + ul {
+  list-style-type: disc !important;
 }
 
 @layer base {
@@ -152,6 +169,7 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    transition: background-color 200ms ease, color 200ms ease;
   }
 }
 

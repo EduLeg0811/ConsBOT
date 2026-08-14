@@ -31,7 +31,7 @@ export function SettingsFields({ value: draft, onChange: setDraft }: Props) {
           value={draft.model}
           onValueChange={(value) => setDraft({ ...draft, model: value as ModelId })}
         >
-          <SelectTrigger className="text-xs bg-white/90 shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
+          <SelectTrigger className="bg-card/90 text-xs shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="text-xs">
@@ -55,7 +55,7 @@ export function SettingsFields({ value: draft, onChange: setDraft }: Props) {
             setDraft({ ...draft, reasoningEffort: value as ChatSettings["reasoningEffort"] })
           }
         >
-          <SelectTrigger className="text-xs bg-white/90 shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
+          <SelectTrigger className="bg-card/90 text-xs shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="text-xs">
@@ -107,7 +107,7 @@ export function SettingsFields({ value: draft, onChange: setDraft }: Props) {
             setDraft({ ...draft, textVerbosity: value as ChatSettings["textVerbosity"] })
           }
         >
-          <SelectTrigger className="text-xs bg-white/90 shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
+          <SelectTrigger className="bg-card/90 text-xs shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="text-xs">
@@ -131,7 +131,7 @@ export function SettingsFields({ value: draft, onChange: setDraft }: Props) {
                 className={
                   selected
                     ? "rounded-lg border border-primary bg-primary/8 px-3 py-2 text-left shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]"
-                    : "rounded-lg border border-border bg-white/90 px-3 py-2 text-left transition-colors hover:bg-primary/5"
+                    : "rounded-lg border border-border bg-card/90 px-3 py-2 text-left transition-colors hover:bg-primary/5"
                 }
                 key={format.id}
                 type="button"
@@ -159,7 +159,7 @@ export function SettingsFields({ value: draft, onChange: setDraft }: Props) {
       <div className="space-y-2">
         <Label>Prompt de sistema</Label>
         <Textarea
-          className="text-[11px] leading-relaxed md:text-[11px] bg-white/90 shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]"
+          className="bg-card/90 text-[11px] leading-relaxed shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)] md:text-[11px]"
           value={draft.systemPrompt}
           rows={5}
           onChange={(event) => setDraft({ ...draft, systemPrompt: event.target.value })}

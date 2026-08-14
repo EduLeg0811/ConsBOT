@@ -89,7 +89,7 @@ export function ChatSidebarContent({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#f7f7f8]">
+    <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
       <div className="flex items-center gap-2 px-3 py-3">
         <button
           type="button"
@@ -139,9 +139,9 @@ export function ChatSidebarContent({
                       size="sm"
                       variant="ghost"
                       className={cn(
-                        "flex-1 gap-2 rounded-full border border-transparent transition-colors hover:bg-slate-200 hover:text-slate-800",
+                        "flex-1 gap-2 rounded-full border border-transparent transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                         selected &&
-                        "font-bold text-emerald-600 hover:bg-slate-200 hover:text-emerald-700",
+                        "font-bold text-emerald-600 dark:text-emerald-300 hover:bg-sidebar-accent hover:text-emerald-700 dark:hover:text-emerald-200",
                       )}
                       onClick={() => setTab(id)}
                       aria-label={label === "Fontes" ? "Fontes de consulta" : label}
@@ -150,7 +150,7 @@ export function ChatSidebarContent({
                       {label}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent className="max-w-52 bg-slate-700 text-center text-[11px] leading-snug text-white">
+                  <TooltipContent className="max-w-52 bg-popover text-center text-[11px] leading-snug text-popover-foreground">
                     {description}
                   </TooltipContent>
                 </Tooltip>
@@ -171,7 +171,7 @@ export function ChatSidebarContent({
                   key={thread.id}
                   className={cn(
                     "group flex items-center gap-1 border-l-2 border-transparent px-3 py-2 transition-colors",
-                    isActive ? "border-primary text-foreground" : "hover:bg-zinc-100",
+                    isActive ? "border-primary text-foreground" : "hover:bg-sidebar-accent",
                   )}
                 >
                   {isEditing ? (
@@ -291,7 +291,7 @@ export function ChatSidebarContent({
             ) : null}
           </div>
           {auditLogs.length === 0 ? (
-            <div className="mx-1 rounded-xl border border-dashed border-border bg-white/60 px-4 py-8 text-center">
+            <div className="mx-1 rounded-xl border border-dashed border-border bg-card/60 px-4 py-8 text-center">
               <FileText className="mx-auto mb-2 size-5 text-muted-foreground/60" />
               <p className="text-sm font-medium">Nenhuma chamada ainda</p>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
@@ -303,7 +303,7 @@ export function ChatSidebarContent({
               {auditLogs.map((log) => (
                 <details
                   key={log.id}
-                  className="group rounded-xl border border-border bg-white shadow-[0_5px_16px_-14px_rgba(25,70,50,0.45)]"
+                  className="group rounded-xl border border-border bg-card shadow-[0_5px_16px_-14px_rgba(25,70,50,0.45)]"
                   open={log.status === "streaming"}
                 >
                   <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
@@ -403,14 +403,14 @@ export function ChatSidebarContent({
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="text-muted-foreground hover:bg-slate-200 hover:text-slate-800"
+                  className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   aria-label={logsEnabled ? "Ocultar painel de Logs" : "Habilitar painel de Logs"}
                   onClick={() => setLogsEnabled((enabled) => !enabled)}
                 >
                   {logsEnabled ? <EyeOff /> : <Eye />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent className="max-w-52 bg-slate-700 text-center text-[11px] leading-snug text-white">
+              <TooltipContent className="max-w-52 bg-popover text-center text-[11px] leading-snug text-popover-foreground">
                 {logsEnabled
                   ? "Ocultar o painel de auditoria de Logs."
                   : "Habilitar o painel de auditoria de Logs."}
@@ -420,7 +420,7 @@ export function ChatSidebarContent({
         </TooltipProvider>
       ) : null}
 
-      <div className="border-t border-zinc-200 bg-[#f7f7f8] px-3 py-3">
+      <div className="border-t border-sidebar-border bg-sidebar px-3 py-3">
         <Button
           variant="ghost"
           size="sm"

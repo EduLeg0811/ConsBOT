@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Maximize2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Maximize2, Moon, Sun } from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatSidebar, ChatSidebarSheet } from "@/components/ChatSidebar";
@@ -46,6 +46,8 @@ const CONTAINER_WIDTH_CONFIG: Record<ContainerWidth, { className: string; label:
 
 export function ThreadPage() {
   const [containerWidth, setContainerWidth] = useState<ContainerWidth>("7xl");
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+  const hasManualThemeRef = useRef(false);
   const [threads, setThreads] = useState<ChatThread[]>(() => {
     // Cada abertura inicia uma conversa nova, mantendo somente a listagem anterior.
     clearAllAuditLogs();
@@ -62,6 +64,19 @@ export function ThreadPage() {
     setAuditLogs(loadAuditLogs(activeId));
   }, [activeId]);
 
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncSystemTheme = (event: MediaQueryListEvent | MediaQueryList) => {
+      if (hasManualThemeRef.current) return;
+      const nextIsDark = event.matches;
+      document.documentElement.classList.toggle("dark", nextIsDark);
+      setIsDark(nextIsDark);
+    };
+    syncSystemTheme(media);
+    media.addEventListener("change", syncSystemTheme);
+    return () => media.removeEventListener("change", syncSystemTheme);
+  }, []);
+
   const persist = useCallback((next: ChatThread[]) => {
     setThreads(next);
     saveThreads(next);
@@ -75,6 +90,15 @@ export function ThreadPage() {
     const currentIndex = CONTAINER_WIDTHS.indexOf(containerWidth);
     const nextWidth = CONTAINER_WIDTHS[(currentIndex + 1) % CONTAINER_WIDTHS.length]!;
     setContainerWidth(nextWidth);
+  };
+
+  const toggleTheme = () => {
+    hasManualThemeRef.current = true;
+    setIsDark((current) => {
+      const next = !current;
+      document.documentElement.classList.toggle("dark", next);
+      return next;
+    });
   };
 
   const handleNew = () => {
@@ -236,14 +260,14 @@ export function ThreadPage() {
                           }
                           className={
                             selected
-                              ? "rounded-lg border border-[#f3bf93] bg-[#fff1e6] px-2.5 py-1.5 text-[11px] font-medium text-[#a64b16] shadow-[0_1px_4px_-3px_rgba(157,78,25,0.65)]"
-                              : "rounded-lg border border-[#eadbd0] bg-[#fffdfb] px-2.5 py-1.5 text-[11px] text-muted-foreground shadow-[0_1px_3px_-3px_rgba(100,70,45,0.42)] transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-700"
+                              ? "rounded-lg border border-orange-300/80 bg-orange-50 px-2.5 py-1.5 text-[11px] font-medium text-orange-800 shadow-[0_1px_4px_-3px_rgba(157,78,25,0.65)] dark:border-orange-300/35 dark:bg-orange-400/15 dark:text-orange-200"
+                              : "rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
                           }
                         >
                           {format.label}
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent className="max-w-56 bg-slate-700 text-center text-[11px] leading-snug text-white">
+                      <TooltipContent className="max-w-56 bg-popover text-center text-[11px] leading-snug text-popover-foreground">
                         {format.description}
                       </TooltipContent>
                     </Tooltip>
@@ -256,9 +280,18 @@ export function ThreadPage() {
                 onClick={cycleContainerWidth}
                 title={`Largura da tela: ${currentContainerWidth.label}`}
                 aria-label={`Largura da tela: ${currentContainerWidth.label}`}
-                className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-slate-100 hover:text-slate-700"
+                className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <Maximize2 className="size-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                title={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+                aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+                className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                {isDark ? <Sun className="size-4" aria-hidden="true" /> : <Moon className="size-4" aria-hidden="true" />}
               </button>
             </div>
           </div>

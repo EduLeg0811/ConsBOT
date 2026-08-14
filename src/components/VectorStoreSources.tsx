@@ -26,6 +26,7 @@ type SourceFile = {
 
 type SourcesResponse = {
   vectorStore: { id: string; label: string };
+  totalFiles: number;
   files: SourceFile[];
   truncated: boolean;
   error?: string;
@@ -162,7 +163,7 @@ export function VectorStoreSources({
       />
 
       {vectorStoreId === "none" && !hasPendingSelection ? (
-        <div className="rounded-xl border border-dashed border-border bg-white/65 px-4 py-8 text-center">
+        <div className="rounded-xl border border-dashed border-border bg-card/65 px-4 py-8 text-center">
           <Database className="mx-auto mb-2 size-5 text-muted-foreground/60" />
           <p className="text-sm font-medium">Busca com RAG desativada</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
@@ -170,17 +171,17 @@ export function VectorStoreSources({
           </p>
         </div>
       ) : loading && !data ? (
-        <div className="rounded-xl border border-border/80 bg-white/65 px-4 py-8 text-center">
+        <div className="rounded-xl border border-border/80 bg-card/65 px-4 py-8 text-center">
           <LoaderCircle className="mx-auto mb-2 size-5 animate-spin text-primary" />
           <p className="text-sm font-medium">Carregando fontes</p>
           <p className="mt-1 text-xs text-muted-foreground">Consultando a OpenAI…</p>
         </div>
       ) : error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50/80 px-4 py-5 text-center">
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-5 text-center">
           <AlertCircle className="mx-auto mb-2 size-5 text-red-500" />
-          <p className="text-sm font-medium text-red-900">Não foi possível carregar</p>
-          <p className="mt-1 break-words text-xs leading-relaxed text-red-700">{error}</p>
-          <Button variant="outline" size="sm" className="mt-3 bg-white" onClick={refresh}>
+          <p className="text-sm font-medium text-destructive">Não foi possível carregar</p>
+          <p className="mt-1 break-words text-xs leading-relaxed text-destructive/85">{error}</p>
+          <Button variant="outline" size="sm" className="mt-3 bg-card" onClick={refresh}>
             Tentar novamente
           </Button>
         </div>
@@ -193,7 +194,7 @@ export function VectorStoreSources({
           </p>
         </div>
       ) : !data ? null : data.files.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-white/65 px-4 py-8 text-center">
+        <div className="rounded-xl border border-dashed border-border bg-card/65 px-4 py-8 text-center">
           <FileText className="mx-auto mb-2 size-5 text-muted-foreground/60" />
           <p className="text-sm font-medium">Base sem arquivos</p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -203,7 +204,7 @@ export function VectorStoreSources({
       ) : (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between px-1 text-[11px] text-muted-foreground">
-            <span>{data?.files.length ?? 0} fontes</span>
+            <span>{data?.totalFiles ?? 0} fontes</span>
             {loading ? (
               <span className="inline-flex items-center gap-1">
                 <LoaderCircle className="size-3 animate-spin" /> Atualizando
@@ -219,7 +220,7 @@ export function VectorStoreSources({
                 title={
                   file.lastError ? `${file.filename} — ${file.lastError.message}` : file.filename
                 }
-                className="rounded-xl border border-border/85 bg-white px-3 py-2 shadow-[0_6px_18px_-16px_rgba(25,70,50,0.5)]"
+                className="rounded-xl border border-border/85 bg-card px-3 py-2 shadow-[0_6px_18px_-16px_rgba(25,70,50,0.5)]"
               >
                 <div className="flex min-w-0 items-center gap-2 text-xs font-normal leading-none">
                   <span className="min-w-0 flex-1 truncate">{name}</span>
@@ -270,7 +271,7 @@ function SourcesHeader({
   disabled: boolean;
 }) {
   return (
-    <div className="mb-3 space-y-3 px-1 pt-1">
+    <div className="mb-7 space-y-3 px-1 pt-1">
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Fontes de consulta
@@ -280,14 +281,14 @@ function SourcesHeader({
         </p>
       </div>
 
-      <div className="space-y-2 rounded-xl border border-emerald-100/80 bg-emerald-50/40 p-3">
+      <div className="mt-5 space-y-2">
         <Label>Busca com RAG</Label>
         <div className="flex items-center gap-2">
           <Select
             value={vectorStoreId}
             onValueChange={(value) => onVectorStoreChange(value as VectorStoreId)}
           >
-            <SelectTrigger className="min-w-0 flex-1 bg-white shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
+            <SelectTrigger className="min-w-0 flex-1 bg-card shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -301,7 +302,7 @@ function SourcesHeader({
           <Button
             variant="outline"
             size="icon"
-            className="shrink-0 bg-white shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]"
+            className="shrink-0 bg-card shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]"
             aria-label="Atualizar fontes"
             title="Atualizar fontes"
             onClick={onRefresh}

@@ -1,7 +1,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUp, Copy, Database, FileText, RefreshCw, Share2 } from "lucide-react";
+import { ArrowUp, Copy, Database, RefreshCw, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -45,21 +45,13 @@ function getRagStatus(
   userMessage: ConsBotUIMessage,
   assistantMessage: ConsBotUIMessage | undefined,
   fallbackVectorStoreId: ChatSettings["vectorStoreId"],
+  sourceCounts: Record<string, number>,
 ) {
   const fileSearchPart = assistantMessage?.parts.find((part) => part.type === "tool-fileSearch");
 
   if (!fileSearchPart || fileSearchPart.type !== "tool-fileSearch") {
     return null;
   }
-
-  const resultCount =
-    fileSearchPart.state === "output-available" &&
-      fileSearchPart.output &&
-      typeof fileSearchPart.output === "object" &&
-      "results" in fileSearchPart.output &&
-      Array.isArray(fileSearchPart.output.results)
-      ? fileSearchPart.output.results.length
-      : null;
 
   const metadata = userMessage.metadata;
   const vectorStoreId =
@@ -70,11 +62,12 @@ function getRagStatus(
       ? metadata.ragVectorStoreId
       : fallbackVectorStoreId;
   const vectorStoreLabel = VECTOR_STORES.find((store) => store.id === vectorStoreId)?.label;
-  const storeDetail = vectorStoreLabel ? ` · ${vectorStoreLabel}` : "";
+  const storeDetail = vectorStoreLabel ? ` ${vectorStoreLabel}` : "";
+  const totalFiles = sourceCounts[vectorStoreId];
 
   return fileSearchPart.state === "output-available"
-    ? `Base RAG${storeDetail}${resultCount === null ? "" : ` · ${resultCount} fonte${resultCount === 1 ? "" : "s"}`}`
-    : `Consultando a base RAG${storeDetail}…`;
+    ? `${storeDetail}${totalFiles === undefined ? "" : ` · ${totalFiles} fonte${totalFiles === 1 ? "" : "s"}`}`
+    : `Consultando ${storeDetail}…`;
 }
 
 function normalizeConscienciologicalLists(text: string) {
@@ -89,7 +82,7 @@ function normalizeConscienciologicalLists(text: string) {
 
       if (items.length === 0) return section;
 
-      return `${heading}${items.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n`;
+      return `${heading}${items.map((item) => `- ${item}`).join("\n")}\n`;
     },
   );
 }
@@ -104,6 +97,11 @@ type Props = {
   onAuditComplete: (id: string, result: AuditCompletion, status?: AuditLog["status"]) => void;
 };
 
+type VectorStoreSummaryResponse = {
+  vectorStore: { id: string; label: string };
+  totalFiles: number;
+};
+
 export function ChatWindow({
   threadId,
   settings,
@@ -116,6 +114,7 @@ export function ChatWindow({
   const [input, setInput] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
+  const [sourceCounts, setSourceCounts] = useState<Record<string, number>>({});
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingAuditId = useRef<string | null>(null);
   const openaiAuditRef = useRef<OpenAIAuditEvent | null>(null);
@@ -135,6 +134,28 @@ export function ChatWindow({
     settings.vectorStoreId === "none" ? "Sem RAG" : activeVectorStore?.label,
     settings.responseFormat === "conscienciological" ? "Confor Conscienciológico" : "Modo livre",
   ].filter((parameter): parameter is string => Boolean(parameter));
+
+  useEffect(() => {
+    if (settings.vectorStoreId === "none" || sourceCounts[settings.vectorStoreId] !== undefined) {
+      return;
+    }
+
+    const controller = new AbortController();
+    void fetch(
+      `/api/vector-store-files?vectorStoreId=${encodeURIComponent(settings.vectorStoreId)}&summary=1`,
+      { signal: controller.signal, headers: { Accept: "application/json" } },
+    )
+      .then(async (response) => {
+        const body = (await response.json()) as VectorStoreSummaryResponse;
+        if (!response.ok || typeof body.totalFiles !== "number") return;
+        setSourceCounts((current) => ({ ...current, [settings.vectorStoreId]: body.totalFiles }));
+      })
+      .catch(() => {
+        // A indicação de RAG continua disponível mesmo se a contagem não puder ser carregada.
+      });
+
+    return () => controller.abort();
+  }, [settings.vectorStoreId, sourceCounts]);
 
   const transport = useMemo(
     () =>
@@ -400,7 +421,7 @@ export function ChatWindow({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="rounded-full text-muted-foreground/70 hover:bg-emerald-50 hover:text-emerald-800"
+                  className="rounded-full text-muted-foreground/70 hover:bg-primary/10 hover:text-primary"
                   aria-label="Gerar novas perguntas iniciais"
                   title="Gerar novas perguntas"
                   onClick={() => void refreshSuggestions()}
@@ -429,10 +450,8 @@ export function ChatWindow({
           {messages.map((message, messageIndex) => {
             const ragStatus =
               message.role === "user"
-                ? getRagStatus(message, messages[messageIndex + 1], settings.vectorStoreId)
+                ? getRagStatus(message, messages[messageIndex + 1], settings.vectorStoreId, sourceCounts)
                 : null;
-            const displayedSourceKeys = new Set<string>();
-
             return (
               <div key={message.id} className="w-full">
                 <Message from={message.role}>
@@ -474,20 +493,10 @@ export function ChatWindow({
                       if (part.type === "tool-fileSearch") {
                         return null;
                       }
-                      if (part.type === "source-document") {
-                        const sourceKey = part.filename ?? part.title ?? `source-${index}`;
-                        if (displayedSourceKeys.has(sourceKey)) return null;
-                        displayedSourceKeys.add(sourceKey);
-                        return (
-                          <div
-                            key={`${message.id}-source-${index}`}
-                            className="mb-1 flex items-center gap-2 text-xs text-muted-foreground"
-                          >
-                            <FileText className="size-3.5 shrink-0" />
-                            <span className="truncate">Fonte: {part.filename ?? part.title}</span>
-                          </div>
-                        );
-                      }
+                      // Os documentos recuperados pelo File Search são suporte interno da
+                      // resposta. As referências bibliográficas exibidas vêm somente do texto
+                      // final produzido pela LLM, evitando duplicação na seção Referências.
+                      if (part.type === "source-document") return null;
                       return null;
                     })}
                   </MessageContent>
@@ -544,7 +553,7 @@ export function ChatWindow({
 
       <div className="pb-5">
         <PromptInput
-          className="[&_[data-slot=input-group]]:rounded-[28px] [&_[data-slot=input-group]]:border-border/70 [&_[data-slot=input-group]]:bg-white [&_[data-slot=input-group]]:shadow-[0_3px_14px_-5px_oklch(0.3_0.02_155/0.22)]"
+          className="[&_[data-slot=input-group]]:rounded-[28px] [&_[data-slot=input-group]]:border-border/70 [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-[0_3px_14px_-5px_oklch(0.3_0.02_155/0.22)]"
           onSubmit={(message, event) => {
             event.preventDefault();
             submit(message.text || input);
@@ -562,7 +571,7 @@ export function ChatWindow({
               status={status}
               disabled={!isBusy && input.trim().length === 0}
               onClick={isBusy ? stopWithAudit : undefined}
-              className="size-10 rounded-full bg-[#10a37f] text-white hover:bg-[#0d8c6d] disabled:bg-[#10a37f]/35 disabled:text-white"
+              className="size-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/35 disabled:text-primary-foreground"
             >
               {isBusy ? undefined : <ArrowUp className="size-5" />}
             </PromptInputSubmit>
