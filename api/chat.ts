@@ -10,9 +10,11 @@ import {
 import type { AuditDataParts } from "../src/lib/audit-log.ts";
 import { DEFAULT_SETTINGS } from "../src/lib/chat-settings.ts";
 import { getAccessLevel } from "./access-level.ts";
+import { enforceModelRateLimit } from "./rate-limit.ts";
 
 type VercelRequest = {
   body?: unknown;
+  headers?: Record<string, string | string[] | undefined>;
 };
 
 type VercelResponse = {
@@ -106,6 +108,24 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       (ALLOWED_MODELS as readonly string[]).includes(body.model)
         ? body.model
         : DEFAULT_SETTINGS.model;
+
+    try {
+      const rateLimit = await enforceModelRateLimit(request, modelName);
+      if (rateLimit.enabled) {
+        response.setHeader("X-RateLimit-Limit", String(rateLimit.limit));
+        response.setHeader("X-RateLimit-Remaining", String(rateLimit.remaining));
+      }
+      if (!rateLimit.allowed) {
+        response.setHeader("Retry-After", String(rateLimit.retryAfterSeconds));
+        response.status(429).end(
+          `Limite diário para ${modelName} atingido. Tente novamente em cerca de ${Math.ceil(rateLimit.retryAfterSeconds / 3600)} hora(s).`,
+        );
+        return;
+      }
+    } catch (rateLimitError) {
+      // A indisponibilidade do Redis não impede o chat; o erro fica somente no log do servidor.
+      console.error("Rate limit unavailable:", rateLimitError);
+    }
 
     const effort =
       isAdmin &&
