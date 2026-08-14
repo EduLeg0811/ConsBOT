@@ -8,7 +8,6 @@ import {
 } from "ai";
 
 import type { AuditDataParts } from "../src/lib/audit-log.ts";
-import { DEFAULT_SETTINGS } from "../src/lib/chat-settings.ts";
 import { getAccessLevel } from "./access-level.ts";
 import { enforceModelRateLimit } from "./rate-limit.ts";
 
@@ -30,6 +29,14 @@ export const config = {
 
 const ALLOWED_MODELS = ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"] as const;
 const EFFORTS = ["none", "low", "medium", "high", "xhigh", "max"] as const;
+// Padrões do backend: mantidos no diretório api para que a função Vercel não
+// dependa de módulos do bundle do cliente em src/.
+const DEFAULT_MODEL = "gpt-5.6-terra";
+const DEFAULT_VECTOR_STORE_ID = "vs_6a7f75cd0be48191b3f3960a518c6ff3";
+const DEFAULT_MAX_OUTPUT_TOKENS = 2048;
+const DEFAULT_RESPONSE_FORMAT = "conscienciological";
+const FALLBACK_SYSTEM_PROMPT =
+  "Você é o ConsBOT, especializado em Conscienciologia. Responda com clareza, precisão, respeito às fontes disponíveis e no idioma do usuário.";
 const VECTOR_STORE_IDS = [
   "vs_6a7f75cd0be48191b3f3960a518c6ff3",
   "vs_6912908250e4819197e23fe725e04fae",
@@ -107,7 +114,7 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       typeof body.model === "string" &&
       (ALLOWED_MODELS as readonly string[]).includes(body.model)
         ? body.model
-        : DEFAULT_SETTINGS.model;
+        : DEFAULT_MODEL;
 
     try {
       const rateLimit = await enforceModelRateLimit(request, modelName);
@@ -145,12 +152,12 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       typeof body.vectorStoreId === "string" &&
       (VECTOR_STORE_IDS as readonly string[]).includes(body.vectorStoreId)
         ? body.vectorStoreId
-        : DEFAULT_SETTINGS.vectorStoreId;
+        : DEFAULT_VECTOR_STORE_ID;
 
     const system =
-      isAdmin && typeof body.systemPrompt === "string" && body.systemPrompt.trim().length > 0
+      typeof body.systemPrompt === "string" && body.systemPrompt.trim().length > 0
         ? body.systemPrompt.trim()
-        : DEFAULT_SETTINGS.systemPrompt;
+        : FALLBACK_SYSTEM_PROMPT;
 
     const maxOutputTokens =
       isAdmin &&
@@ -158,11 +165,11 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       Number.isFinite(body.maxOutputTokens) &&
       body.maxOutputTokens > 0
         ? Math.min(Math.round(body.maxOutputTokens), 32000)
-        : DEFAULT_SETTINGS.maxOutputTokens;
+        : DEFAULT_MAX_OUTPUT_TOKENS;
 
     const isConscienciologicalFormat = isAdmin
       ? body.responseFormat === "conscienciological"
-      : DEFAULT_SETTINGS.responseFormat === "conscienciological";
+      : DEFAULT_RESPONSE_FORMAT === "conscienciological";
     const responseLengthGuidance = maxOutputTokens
       ? RESPONSE_LENGTH_GUIDANCE[maxOutputTokens]
       : undefined;
