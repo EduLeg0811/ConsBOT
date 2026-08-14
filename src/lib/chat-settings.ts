@@ -167,7 +167,7 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   responseFormat: "chatgpt",
   systemPrompt: CHATGPT_SYSTEM_PROMPT,
   reasoningEffort: "none",
-  maxOutputTokens: 512,
+  maxOutputTokens: 1024,
 };
 
 export const RESPONSE_LENGTH_VALUES = [256, 512, 1024, 2048, 4096] as const;

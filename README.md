@@ -41,11 +41,13 @@ Abra [http://localhost:5173](http://localhost:5173) no seu navegador.
 ## 📦 Build e Deploy na Vercel
 
 ### Build de Produção
+
 ```bash
 npm run build
 ```
 
 ### Deploy na Vercel
+
 1. Conecte este repositório à **Vercel**.
 2. Adicione a variável de ambiente `OPENAI_API_KEY` no painel de configurações da Vercel.
 3. O deploy configurará automaticamente o frontend SPA e a rota `/api/chat` como serverless function.

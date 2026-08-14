@@ -88,10 +88,7 @@ export async function POST(request: Request) {
     // O schema já valida cada pergunta. Não descartamos sugestões utilizáveis
     // apenas porque o modelo retornou menos de oito itens em uma chamada.
     if (result.object.length === 0) {
-      return Response.json(
-        { error: "A LLM não retornou perguntas sugeridas." },
-        { status: 502 },
-      );
+      return Response.json({ error: "A LLM não retornou perguntas sugeridas." }, { status: 502 });
     }
 
     return Response.json({
