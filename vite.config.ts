@@ -2,20 +2,22 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
-import { createOpenAI } from "@ai-sdk/openai";
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
-
-function toSafeStreamError(error: unknown) {
-  const message = error instanceof Error ? error.message : "Erro desconhecido ao gerar a resposta.";
-  return message.replace(/sk-[A-Za-z0-9_-]+/g, "[chave removida]");
-}
+import { POST as handleChatPost } from "./api/chat.ts";
+import { POST as handleSuggestionsPost } from "./api/suggestions.ts";
+import { GET as handleVectorStoreFilesGet } from "./api/vector-store-files.ts";
 
 function devApiChatPlugin(): Plugin {
   return {
     name: "dev-api-chat",
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        if (req.url?.startsWith("/api/chat") && req.method === "POST") {
+        const isChatRequest = req.url?.startsWith("/api/chat") && req.method === "POST";
+        const isSuggestionsRequest =
+          req.url?.startsWith("/api/suggestions") && req.method === "POST";
+        const isSourcesRequest =
+          req.url?.startsWith("/api/vector-store-files") && req.method === "GET";
+
+        if (isChatRequest || isSuggestionsRequest || isSourcesRequest) {
           let bodyStr = "";
           req.on("data", (chunk: Buffer) => {
             bodyStr += chunk.toString();
@@ -30,58 +32,21 @@ function devApiChatPlugin(): Plugin {
                 res.end("Erro: OPENAI_API_KEY não configurada no arquivo .env");
                 return;
               }
+              process.env["OPENAI_API_KEY"] = apiKey;
 
-              const body = JSON.parse(bodyStr || "{}");
-              if (!Array.isArray(body.messages)) {
-                res.statusCode = 400;
-                res.setHeader("Content-Type", "text/plain; charset=utf-8");
-                res.end("Mensagens são obrigatórias");
-                return;
-              }
-
-              const modelName = body.model || "gpt-4o";
-              const effort = body.reasoningEffort || "medium";
-              const system = body.systemPrompt?.trim() || undefined;
-              const maxOutputTokens =
-                typeof body.maxOutputTokens === "number" && body.maxOutputTokens > 0
-                  ? Math.min(Math.round(body.maxOutputTokens), 32000)
-                  : undefined;
-              const topP =
-                typeof body.topP === "number" && body.topP > 0 && body.topP <= 1
-                  ? body.topP
-                  : undefined;
-              const sendReasoning = body.reasoningSummary !== false;
-
-              const openai = createOpenAI({ apiKey });
-              const isReasoningModel = typeof modelName === "string" && modelName.startsWith("o");
-
-              const result = streamText({
-                model: openai(modelName),
-                ...(system && !isReasoningModel ? { system } : {}),
-                ...(topP && !isReasoningModel ? { topP } : {}),
-                messages: await convertToModelMessages(body.messages as UIMessage[]),
-                providerOptions: isReasoningModel
-                  ? {
-                      openai: {
-                        reasoningEffort: effort,
-                        ...(maxOutputTokens ? { maxOutputTokens } : {}),
-                      },
-                    }
-                  : {
-                      openai: {
-                        ...(maxOutputTokens ? { maxOutputTokens } : {}),
-                      },
-                    },
+              const abortController = new AbortController();
+              req.once("aborted", () => abortController.abort());
+              const request = new Request(`http://localhost${req.url}`, {
+                method: req.method,
+                headers: { "Content-Type": req.headers["content-type"] ?? "application/json" },
+                ...(isChatRequest || isSuggestionsRequest ? { body: bodyStr } : {}),
+                signal: abortController.signal,
               });
-
-              const response = result.toUIMessageStreamResponse({
-                originalMessages: body.messages as UIMessage[],
-                sendReasoning,
-                onError: (error) => {
-                  console.error("Dev API stream error:", error);
-                  return toSafeStreamError(error);
-                },
-              });
+              const response = isChatRequest
+                ? await handleChatPost(request)
+                : isSuggestionsRequest
+                  ? await handleSuggestionsPost(request)
+                  : await handleVectorStoreFilesGet(request);
 
               res.statusCode = response.status;
               response.headers.forEach((value, key) => {
@@ -98,7 +63,7 @@ function devApiChatPlugin(): Plugin {
               }
               res.end();
             } catch (err) {
-              console.error("Dev API Error:", err);
+              console.error("Dev API error:", err);
               res.statusCode = 500;
               res.setHeader("Content-Type", "text/plain; charset=utf-8");
               const message = err instanceof Error ? err.message : "Erro desconhecido";
@@ -114,12 +79,7 @@ function devApiChatPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [
-    tsconfigPaths(),
-    tailwindcss(),
-    react(),
-    devApiChatPlugin(),
-  ],
+  plugins: [tsconfigPaths(), tailwindcss(), react(), devApiChatPlugin()],
   server: {
     port: 5173,
   },

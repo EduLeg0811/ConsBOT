@@ -8,6 +8,7 @@
     "types": ["vite/client", "node"],
 
     "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
     "noEmit": true,
 
     "skipLibCheck": true,

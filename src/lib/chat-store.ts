@@ -1,6 +1,14 @@
 import type { UIMessage } from "ai";
 
-import { DEFAULT_SETTINGS, loadSettings, type ChatSettings } from "@/lib/chat-settings";
+import {
+  DEFAULT_SETTINGS,
+  loadSettings,
+  MODELS,
+  normalizeMaxOutputTokens,
+  RESPONSE_FORMATS,
+  VECTOR_STORES,
+  type ChatSettings,
+} from "@/lib/chat-settings";
 
 export type ChatThread = {
   id: string;
@@ -27,12 +35,25 @@ function normalize(raw: unknown): ChatThread | null {
   if (!raw || typeof raw !== "object") return null;
   const t = raw as Partial<ChatThread>;
   if (typeof t.id !== "string") return null;
+  const settings = { ...DEFAULT_SETTINGS, ...(t.settings ?? {}) };
+  settings.maxOutputTokens = normalizeMaxOutputTokens(settings.maxOutputTokens);
+  const model = MODELS.some((candidate) => candidate.id === settings.model)
+    ? settings.model
+    : DEFAULT_SETTINGS.model;
+  const vectorStoreId = VECTOR_STORES.some((candidate) => candidate.id === settings.vectorStoreId)
+    ? settings.vectorStoreId
+    : DEFAULT_SETTINGS.vectorStoreId;
+  const responseFormat = RESPONSE_FORMATS.some(
+    (candidate) => candidate.id === settings.responseFormat,
+  )
+    ? settings.responseFormat
+    : DEFAULT_SETTINGS.responseFormat;
   return {
     id: t.id,
     title: typeof t.title === "string" && t.title.trim() ? t.title : "Nova conversa",
     updatedAt: typeof t.updatedAt === "number" ? t.updatedAt : Date.now(),
     messages: [],
-    settings: { ...DEFAULT_SETTINGS, ...(t.settings ?? {}) },
+    settings: { ...settings, model, vectorStoreId, responseFormat },
   };
 }
 
@@ -98,7 +119,9 @@ export function ensureThread(requestedId?: string): { threads: ChatThread[]; act
 
 export function upsertThread(threads: ChatThread[], thread: ChatThread): ChatThread[] {
   const exists = threads.some((t) => t.id === thread.id);
-  const next = exists ? threads.map((t) => (t.id === thread.id ? thread : t)) : [thread, ...threads];
+  const next = exists
+    ? threads.map((t) => (t.id === thread.id ? thread : t))
+    : [thread, ...threads];
   return next.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 

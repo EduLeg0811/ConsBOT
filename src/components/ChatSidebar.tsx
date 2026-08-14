@@ -39,7 +39,7 @@ export function ChatSidebar(props: ChatSidebarProps) {
 
   return (
     <aside
-      className="relative hidden shrink-0 border-r border-border bg-zinc-50 lg:flex lg:flex-col"
+      className="relative hidden shrink-0 border-r border-zinc-200 bg-[#f7f7f8] lg:flex lg:flex-col"
       style={{ width }}
     >
       <ChatSidebarContent {...props} />
