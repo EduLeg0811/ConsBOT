@@ -11,6 +11,7 @@ type VercelResponse = {
 };
 
 const VECTOR_STORES = {
+  vs_6a7f75cd0be48191b3f3960a518c6ff3: "CONS_LIBRARY",
   vs_6912908250e4819197e23fe725e04fae: "ALLWV",
   vs_698be4e07c748191b834905ebc7a7da3: "LO",
   vs_69931da436e48191b43453e845e63bd3: "TRANSLATE",

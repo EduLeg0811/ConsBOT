@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { Maximize2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatSidebar, ChatSidebarSheet } from "@/components/ChatSidebar";
 import { ChatWindow } from "@/components/ChatWindow";
 import { Toaster } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import {
   saveSettings,
   systemPromptForFormat,
@@ -32,7 +34,25 @@ import {
   type ChatThread,
 } from "@/lib/chat-store";
 
+const CONTAINER_WIDTHS = ["5xl", "6xl", "7xl", "full"] as const;
+type ContainerWidth = (typeof CONTAINER_WIDTHS)[number];
+const CONTAINER_WIDTH_STORAGE_KEY = "consbot:container-width";
+
+const CONTAINER_WIDTH_CONFIG: Record<ContainerWidth, { className: string; label: string }> = {
+  "5xl": { className: "max-w-5xl", label: "5XL" },
+  "6xl": { className: "max-w-6xl", label: "6XL" },
+  "7xl": { className: "max-w-7xl", label: "7XL" },
+  full: { className: "max-w-full", label: "Full" },
+};
+
+function loadContainerWidth(): ContainerWidth {
+  if (typeof window === "undefined") return "7xl";
+  const saved = window.localStorage.getItem(CONTAINER_WIDTH_STORAGE_KEY);
+  return CONTAINER_WIDTHS.includes(saved as ContainerWidth) ? (saved as ContainerWidth) : "7xl";
+}
+
 export function ThreadPage() {
+  const [containerWidth, setContainerWidth] = useState<ContainerWidth>(loadContainerWidth);
   const [threads, setThreads] = useState<ChatThread[]>(() => {
     // Cada abertura começa uma sessão limpa; o histórico anterior nunca é reutilizado.
     clearAllThreads();
@@ -56,6 +76,13 @@ export function ThreadPage() {
   const active = threads.find((thread) => thread.id === activeId) ?? null;
 
   const goTo = (id: string) => setActiveId(id);
+
+  const cycleContainerWidth = () => {
+    const currentIndex = CONTAINER_WIDTHS.indexOf(containerWidth);
+    const nextWidth = CONTAINER_WIDTHS[(currentIndex + 1) % CONTAINER_WIDTHS.length]!;
+    setContainerWidth(nextWidth);
+    window.localStorage.setItem(CONTAINER_WIDTH_STORAGE_KEY, nextWidth);
+  };
 
   const handleNew = () => {
     const thread = createThread();
@@ -167,20 +194,27 @@ export function ThreadPage() {
     auditLogs,
     onClearAuditLogs: handleClearAuditLogs,
   };
+  const currentContainerWidth = CONTAINER_WIDTH_CONFIG[containerWidth];
 
   return (
     <div className="flex h-screen bg-background text-foreground">
       <ChatSidebar {...sidebarProps} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center gap-3 border-b border-border/70 px-4 py-2.5">
-          <div className="lg:hidden">
-            <ChatSidebarSheet {...sidebarProps} />
-          </div>
-          <img src="/icon.png" alt="Ícone do ConsBOT" className="size-10 shrink-0 object-contain" />
-          <div className="min-w-0 flex-1 lg:flex-none">
-            <h1 className="truncate text-lg font-semibold tracking-tight">ConsBOT</h1>
-          </div>
-          <div className="order-3 flex w-full flex-wrap items-center justify-end gap-2 lg:order-none lg:ml-auto lg:w-auto lg:flex-nowrap">
+        <header className="border-b border-border/70">
+          <div
+            className={cn(
+              "mx-auto flex w-full flex-wrap items-center gap-3 px-4 py-2.5 transition-all duration-300",
+              currentContainerWidth.className,
+            )}
+          >
+            <div className="lg:hidden">
+              <ChatSidebarSheet {...sidebarProps} />
+            </div>
+            <img src="/icon.png" alt="Ícone do ConsBOT" className="size-10 shrink-0 object-contain" />
+            <div className="min-w-0 flex-1 lg:flex-none">
+              <h1 className="truncate text-lg font-semibold tracking-tight">ConsBOT</h1>
+            </div>
+            <div className="order-3 flex w-full flex-wrap items-center justify-end gap-2 lg:order-none lg:ml-auto lg:w-auto lg:flex-nowrap">
             <TooltipProvider delayDuration={250}>
               <div className="flex items-center gap-1" aria-label="Formato da resposta">
                 {[
@@ -226,6 +260,16 @@ export function ThreadPage() {
                 })}
               </div>
             </TooltipProvider>
+              <button
+                type="button"
+                onClick={cycleContainerWidth}
+                title={`Largura da tela: ${currentContainerWidth.label}`}
+                aria-label={`Largura da tela: ${currentContainerWidth.label}`}
+                className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-slate-100 hover:text-slate-700"
+              >
+                <Maximize2 className="size-4" aria-hidden="true" />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -233,6 +277,7 @@ export function ThreadPage() {
           key={activeId}
           threadId={activeId}
           settings={active.settings}
+          containerWidthClass={currentContainerWidth.className}
           initialMessages={[]}
           onMessagesChange={handleMessagesChange}
           onAuditStart={handleAuditStart}

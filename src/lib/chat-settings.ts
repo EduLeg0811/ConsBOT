@@ -25,6 +25,11 @@ export const VECTOR_STORES = [
     description: "Responde sem consultar uma base RAG.",
   },
   {
+    id: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
+    label: "CONS_LIBRARY",
+    description: "Biblioteca principal da Conscienciologia.",
+  },
+  {
     id: "vs_6912908250e4819197e23fe725e04fae",
     label: "ALLWV",
     description: "Base vetorial ALLWV.",
@@ -136,6 +141,7 @@ Para perguntas conceituais, explicativas ou analíticas sobre Conscienciologia, 
 - Todo parágrafo dessas três seções deve começar com uma palavra-síntese em negrito, seguida de ponto e espaço: **Palavra-síntese.** Desenvolvimento do parágrafo. Escolha uma palavra que represente a ideia central do próprio parágrafo.
 - Não crie a seção "Exemplo" se não houver complemento realmente útil. Não repita toda a argumentação na conclusão.
 - Toda sequência de itens deve ser uma lista numerada em Markdown, sem exceções: cada linha precisa começar explicitamente por 1., 2., 3. e assim por diante, seguido de espaço e do item. Nunca use bullets, travessões ou linhas soltas para representar itens de uma lista. As sugestões devem ser específicas, diretamente relacionadas à consulta e consecutivas, sem linhas em branco entre os itens.
+- Em **Sugestões de Aprofundamento**, a numeração é obrigatória em todos os casos: escreva cada sugestão como 1., 2., 3. e assim por diante. Nunca entregue sugestões em bullets, travessões ou linhas sem índice.
 
 ## Referências
 Crie a seção # Referências somente se a resposta utilizar fontes identificáveis fornecidas pelo sistema. Ela deve ser a última seção da resposta, usar lista numerada consecutiva sem espaçamento extra e incluir cada fonte apenas uma vez, mesmo quando a mesma fonte sustentar mais de uma afirmação. Inclua apenas dados bibliográficos disponíveis no contexto.
@@ -165,7 +171,7 @@ export type ChatSettings = {
 
 export const DEFAULT_SETTINGS: ChatSettings = {
   model: "gpt-5.6-terra",
-  vectorStoreId: "vs_6912908250e4819197e23fe725e04fae",
+  vectorStoreId: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
   responseFormat: "chatgpt",
   systemPrompt: CHATGPT_SYSTEM_PROMPT,
   reasoningEffort: "none",

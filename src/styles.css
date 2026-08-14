@@ -154,3 +154,29 @@
     color: var(--color-foreground);
   }
 }
+
+/* Listas no modo ChatGPT: numeração consistente, com zero à esquerda quando
+ * a própria lista ultrapassa dez itens. */
+.message-response-chatgpt :is(ul, ol) {
+  list-style: none !important;
+  counter-reset: consbot-list-item;
+  padding-left: 0;
+}
+
+.message-response-chatgpt :is(ul, ol) > li {
+  counter-increment: consbot-list-item;
+  padding-left: 2rem;
+  position: relative;
+}
+
+.message-response-chatgpt :is(ul, ol) > li::before {
+  content: counter(consbot-list-item, decimal) ".";
+  left: 0;
+  position: absolute;
+  text-align: right;
+  width: 1.5rem;
+}
+
+.message-response-chatgpt :is(ul, ol):has(> li:nth-child(10)) > li::before {
+  content: counter(consbot-list-item, decimal-leading-zero) ".";
+}

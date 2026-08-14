@@ -27,6 +27,7 @@ export const config = {
 const ALLOWED_MODELS = ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"] as const;
 const EFFORTS = ["none", "low", "medium", "high", "xhigh", "max"] as const;
 const VECTOR_STORE_IDS = [
+  "vs_6a7f75cd0be48191b3f3960a518c6ff3",
   "vs_6912908250e4819197e23fe725e04fae",
   "vs_698be4e07c748191b834905ebc7a7da3",
   "vs_69931da436e48191b43453e845e63bd3",

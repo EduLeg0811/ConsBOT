@@ -79,15 +79,15 @@ function getRagStatus(
 
 function normalizeConscienciologicalLists(text: string) {
   return text.replace(
-    /(^#\s+Sugestões de Aprofundamento\s*\r?\n+)([\s\S]*?)(?=\r?\n#\s|\s*$)/gim,
+    /(^#{1,6}\s+Sugestões de Aprofundamento:?\s*\r?\n+)([\s\S]*?)(?=\r?\n#{1,6}\s|\s*$)/gim,
     (section, heading: string, content: string) => {
       const items = content
         .split(/\r?\n/)
         .map((line) => line.trim())
+        .map((line) => line.replace(/^(?:\d+[.)]|[-*+])\s+/, ""))
         .filter(Boolean);
 
-      const alreadyMarkdownList = items.some((item) => /^(?:\d+\.|[-*+])\s+/.test(item));
-      if (items.length < 2 || alreadyMarkdownList) return section;
+      if (items.length === 0) return section;
 
       return `${heading}${items.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n`;
     },
@@ -97,6 +97,7 @@ function normalizeConscienciologicalLists(text: string) {
 type Props = {
   threadId: string;
   settings: ChatSettings;
+  containerWidthClass: string;
   initialMessages: ConsBotUIMessage[];
   onMessagesChange: (messages: ConsBotUIMessage[]) => void;
   onAuditStart: (request: unknown) => string;
@@ -106,6 +107,7 @@ type Props = {
 export function ChatWindow({
   threadId,
   settings,
+  containerWidthClass,
   initialMessages,
   onMessagesChange,
   onAuditStart,
@@ -373,7 +375,9 @@ export function ChatWindow({
   };
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden px-4">
+    <main
+      className={`mx-auto flex w-full ${containerWidthClass} flex-1 flex-col overflow-hidden px-4 transition-all duration-300`}
+    >
       <Conversation className="flex-1">
         <ConversationContent className="gap-5 py-6">
           {messages.length === 0 ? (

@@ -117,7 +117,9 @@ export function VectorStoreSources({
   useEffect(() => {
     const requestedStoreId = request.vectorStoreId;
     if (requestedStoreId === "none") {
-      setData(null);
+      // Ao remontar o painel após trocar de menu, `data` já pode ter sido
+      // restaurado do cache. Não o limpe: a ausência de uma nova requisição
+      // significa justamente que o usuário ainda não pediu atualização.
       setError(null);
       setLoading(false);
       return;
@@ -315,7 +317,7 @@ function SourcesHeader({
           )}
         >
           {pending
-            ? "Seleção alterada — pressione atualizar para aplicar."
+            ? "Seleção alterada: atualize"
             : vectorStoreId === "none"
               ? "Nenhuma base será usada nas chamadas."
               : `Vector Store: ${loadedStoreLabel ?? "aguardando…"}`}
