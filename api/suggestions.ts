@@ -14,10 +14,6 @@ const suggestionSchema = z
   .trim()
   .min(16)
   .max(120)
-  .regex(/^[A-Za-zÀ-ÖØ-öø-ÿ0-9 .,;:!?…'"“”‘’()\[\]{}<>/\\—–-]+$/, {
-    message: "Use somente caracteres da escrita latina.",
-  })
-  .regex(/\?$/, { message: "A pergunta deve terminar com ponto de interrogação." })
   .describe(
     "Uma pergunta inicial completa, clara e convidativa em português do Brasil, terminada em ponto de interrogação.",
   );
@@ -25,6 +21,13 @@ const suggestionSchema = z
 const suggestionsSchema = z.object({
   suggestions: z.array(suggestionSchema).length(8, "Retorne exatamente oito perguntas."),
 });
+
+function isCompletePortugueseSuggestion(value: string) {
+  return (
+    value.endsWith("?") &&
+    /^[A-Za-zÀ-ÖØ-öø-ÿ0-9 .,;:!?…'"“”‘’()\[\]{}<>/\\—–-]+$/.test(value)
+  );
+}
 
 function toSafeAuditValue(value: unknown): unknown {
   const json = JSON.stringify(value, (key, currentValue: unknown) => {
@@ -96,7 +99,10 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       },
     });
 
-    if (result.object.suggestions.length !== 8) {
+    if (
+      result.object.suggestions.length !== 8 ||
+      !result.object.suggestions.every(isCompletePortugueseSuggestion)
+    ) {
       response.status(502).json({ error: "A LLM não retornou perguntas sugeridas." });
       return;
     }
