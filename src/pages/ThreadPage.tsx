@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
+  DEFAULT_SETTINGS,
   systemPromptForFormat,
   type ChatSettings,
   type ResponseFormatId,
@@ -59,6 +60,17 @@ export function ThreadPage() {
   });
   const [activeId, setActiveId] = useState<string>(() => threads[0]!.id);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [accessLevel, setAccessLevel] = useState<0 | 1>(0);
+
+  useEffect(() => {
+    void fetch("/api/access-level", { headers: { Accept: "application/json" } })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Não foi possível obter o nível de acesso.");
+        return (await response.json()) as { accessLevel?: unknown };
+      })
+      .then((body) => setAccessLevel(body.accessLevel === 1 ? 1 : 0))
+      .catch(() => setAccessLevel(0));
+  }, []);
 
   useEffect(() => {
     setAuditLogs(loadAuditLogs(activeId));
@@ -83,6 +95,8 @@ export function ThreadPage() {
   }, []);
 
   const active = threads.find((thread) => thread.id === activeId) ?? null;
+  const isAdmin = accessLevel === 1;
+  const effectiveSettings = isAdmin && active ? active.settings : DEFAULT_SETTINGS;
 
   const goTo = (id: string) => setActiveId(id);
 
@@ -132,6 +146,7 @@ export function ThreadPage() {
   };
 
   const handleSettingsChange = (settings: ChatSettings) => {
+    if (!isAdmin) return;
     if (!active) return;
     persist(upsertThread(threads ?? [], { ...active, settings, updatedAt: active.updatedAt }));
   };
@@ -199,7 +214,8 @@ export function ThreadPage() {
   const sidebarProps = {
     threads,
     activeId,
-    settings: active.settings,
+    settings: effectiveSettings,
+    isAdmin,
     onSettingsChange: handleSettingsChange,
     onSelect: goTo,
     onNew: handleNew,
@@ -231,7 +247,7 @@ export function ThreadPage() {
             </div>
             <div className="order-3 flex w-full flex-wrap items-center justify-end gap-2 lg:order-none lg:ml-auto lg:w-auto lg:flex-nowrap">
             <TooltipProvider delayDuration={250}>
-              <div className="flex items-center gap-1" aria-label="Formato da resposta">
+              {isAdmin ? <div className="flex items-center gap-1" aria-label="Formato da resposta">
                 {[
                   {
                     id: "chatgpt",
@@ -273,7 +289,7 @@ export function ThreadPage() {
                     </Tooltip>
                   );
                 })}
-              </div>
+              </div> : null}
             </TooltipProvider>
               <button
                 type="button"
@@ -300,7 +316,7 @@ export function ThreadPage() {
         <ChatWindow
           key={activeId}
           threadId={activeId}
-          settings={active.settings}
+          settings={effectiveSettings}
           containerWidthClass={currentContainerWidth.className}
           initialMessages={[]}
           onMessagesChange={handleMessagesChange}

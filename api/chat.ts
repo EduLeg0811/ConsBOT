@@ -8,6 +8,8 @@ import {
 } from "ai";
 
 import type { AuditDataParts } from "../src/lib/audit-log.ts";
+import { DEFAULT_SETTINGS } from "../src/lib/chat-settings.ts";
+import { getAccessLevel } from "./access-level.ts";
 
 type VercelRequest = {
   body?: unknown;
@@ -97,41 +99,50 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       return;
     }
 
+    const isAdmin = getAccessLevel() === 1;
     const modelName =
-      typeof body.model === "string" && (ALLOWED_MODELS as readonly string[]).includes(body.model)
+      isAdmin &&
+      typeof body.model === "string" &&
+      (ALLOWED_MODELS as readonly string[]).includes(body.model)
         ? body.model
-        : "gpt-5.6-terra";
+        : DEFAULT_SETTINGS.model;
 
     const effort =
+      isAdmin &&
       typeof body.reasoningEffort === "string" &&
       (EFFORTS as readonly string[]).includes(body.reasoningEffort)
         ? body.reasoningEffort
         : "none";
 
     const textVerbosity =
+      isAdmin &&
       typeof body.textVerbosity === "string" && ["low", "medium", "high"].includes(body.textVerbosity)
         ? body.textVerbosity
         : "low";
 
     const vectorStoreId =
+      isAdmin &&
       typeof body.vectorStoreId === "string" &&
       (VECTOR_STORE_IDS as readonly string[]).includes(body.vectorStoreId)
         ? body.vectorStoreId
-        : undefined;
+        : DEFAULT_SETTINGS.vectorStoreId;
 
     const system =
-      typeof body.systemPrompt === "string" && body.systemPrompt.trim().length > 0
+      isAdmin && typeof body.systemPrompt === "string" && body.systemPrompt.trim().length > 0
         ? body.systemPrompt.trim()
-        : undefined;
+        : DEFAULT_SETTINGS.systemPrompt;
 
     const maxOutputTokens =
+      isAdmin &&
       typeof body.maxOutputTokens === "number" &&
       Number.isFinite(body.maxOutputTokens) &&
       body.maxOutputTokens > 0
         ? Math.min(Math.round(body.maxOutputTokens), 32000)
-        : undefined;
+        : DEFAULT_SETTINGS.maxOutputTokens;
 
-    const isConscienciologicalFormat = body.responseFormat === "conscienciological";
+    const isConscienciologicalFormat = isAdmin
+      ? body.responseFormat === "conscienciological"
+      : DEFAULT_SETTINGS.responseFormat === "conscienciological";
     const responseLengthGuidance = maxOutputTokens
       ? RESPONSE_LENGTH_GUIDANCE[maxOutputTokens]
       : undefined;

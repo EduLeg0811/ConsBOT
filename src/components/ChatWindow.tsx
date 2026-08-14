@@ -437,7 +437,7 @@ export function ChatWindow({
                       key={suggestion}
                       type="button"
                       onClick={() => submit(suggestion)}
-                      className="rounded-2xl border border-border bg-card/80 px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                      className="rounded-2xl border border-border bg-card/80 px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted"
                     >
                       {suggestion}
                     </button>

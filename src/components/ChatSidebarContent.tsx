@@ -29,6 +29,7 @@ export type ChatSidebarProps = {
   threads: ChatThread[];
   activeId: string;
   settings: ChatSettings;
+  isAdmin: boolean;
   onSettingsChange: (settings: ChatSettings) => void;
   onSelect: (id: string) => void;
   onNew: () => void;
@@ -52,6 +53,7 @@ export function ChatSidebarContent({
   threads,
   activeId,
   settings,
+  isAdmin,
   onSettingsChange,
   onSelect,
   onNew,
@@ -129,7 +131,7 @@ export function ChatSidebarContent({
               description: "Audite as chamadas e respostas da LLM.",
             },
           ]
-            .filter(({ id }) => id !== "logs" || logsEnabled)
+            .filter(({ id }) => (id !== "logs" || logsEnabled) && (id !== "settings" || isAdmin))
             .map(({ id, label, icon: Icon, description }) => {
               const selected = tab === id;
               return (
@@ -267,6 +269,7 @@ export function ChatSidebarContent({
         <VectorStoreSources
           vectorStoreId={settings.vectorStoreId}
           onVectorStoreChange={(vectorStoreId) => onSettingsChange({ ...settings, vectorStoreId })}
+          showControls={isAdmin}
         />
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
@@ -424,7 +427,7 @@ export function ChatSidebarContent({
         <Button
           variant="ghost"
           size="sm"
-          className="w-full justify-start gap-2 text-destructive hover:text-destructive"
+          className="w-full justify-start gap-2 text-destructive hover:bg-sidebar-accent hover:text-destructive active:bg-sidebar-accent"
           onClick={onClearAll}
         >
           <Trash2 />

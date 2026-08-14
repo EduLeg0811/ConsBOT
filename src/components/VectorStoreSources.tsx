@@ -70,9 +70,11 @@ function extensionColor(extension: string) {
 export function VectorStoreSources({
   vectorStoreId,
   onVectorStoreChange,
+  showControls,
 }: {
   vectorStoreId: VectorStoreId;
   onVectorStoreChange: (vectorStoreId: VectorStoreId) => void;
+  showControls: boolean;
 }) {
   const [data, setData] = useState<SourcesResponse | null>(() =>
     cachedSourcesByStore.get(vectorStoreId) ?? null,
@@ -160,6 +162,7 @@ export function VectorStoreSources({
         onVectorStoreChange={handleVectorStoreChange}
         onRefresh={refresh}
         disabled={loading}
+        showControls={showControls}
       />
 
       {vectorStoreId === "none" && !hasPendingSelection ? (
@@ -262,6 +265,7 @@ function SourcesHeader({
   onVectorStoreChange,
   onRefresh,
   disabled,
+  showControls,
 }: {
   vectorStoreId: VectorStoreId;
   loadedStoreLabel: string | null;
@@ -269,6 +273,7 @@ function SourcesHeader({
   onVectorStoreChange: (vectorStoreId: VectorStoreId) => void;
   onRefresh: () => void;
   disabled: boolean;
+  showControls: boolean;
 }) {
   return (
     <div className="mb-7 space-y-3 px-1 pt-1">
@@ -283,34 +288,36 @@ function SourcesHeader({
 
       <div className="mt-5 space-y-2">
         <Label>Busca com RAG</Label>
-        <div className="flex items-center gap-2">
-          <Select
-            value={vectorStoreId}
-            onValueChange={(value) => onVectorStoreChange(value as VectorStoreId)}
-          >
-            <SelectTrigger className="min-w-0 flex-1 bg-card shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {VECTOR_STORES.map((store) => (
-                <SelectItem key={store.id} value={store.id}>
-                  {store.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="icon"
-            className="shrink-0 bg-card shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]"
-            aria-label="Atualizar fontes"
-            title="Atualizar fontes"
-            onClick={onRefresh}
-            disabled={disabled}
-          >
-            <RefreshCw className={cn(disabled && "animate-spin")} />
-          </Button>
-        </div>
+        {showControls ? (
+          <div className="flex items-center gap-2">
+            <Select
+              value={vectorStoreId}
+              onValueChange={(value) => onVectorStoreChange(value as VectorStoreId)}
+            >
+              <SelectTrigger className="min-w-0 flex-1 bg-card shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {VECTOR_STORES.map((store) => (
+                  <SelectItem key={store.id} value={store.id}>
+                    {store.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              className="shrink-0 bg-card shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]"
+              aria-label="Atualizar fontes"
+              title="Atualizar fontes"
+              onClick={onRefresh}
+              disabled={disabled}
+            >
+              <RefreshCw className={cn(disabled && "animate-spin")} />
+            </Button>
+          </div>
+        ) : null}
         <p
           className={cn(
             "text-[11px] leading-relaxed",

@@ -10,6 +10,12 @@ type VercelResponse = {
   end: () => void;
 };
 
+const DEFAULT_VECTOR_STORE_ID = "vs_6a7f75cd0be48191b3f3960a518c6ff3";
+
+function isAdmin() {
+  return process.env.ACCESS_LEVEL === "1";
+}
+
 const VECTOR_STORES = {
   vs_6a7f75cd0be48191b3f3960a518c6ff3: "CONS_LIBRARY",
   vs_6912908250e4819197e23fe725e04fae: "ALLWV",
@@ -153,7 +159,11 @@ async function addFileNames(files: VectorStoreFile[], apiKey: string, signal: Ab
 export async function GET(request: VercelRequest, response: VercelResponse) {
   try {
     const rawVectorStoreId = request.query?.vectorStoreId;
-    const vectorStoreId = typeof rawVectorStoreId === "string" ? rawVectorStoreId : null;
+    const vectorStoreId = isAdmin()
+      ? typeof rawVectorStoreId === "string"
+        ? rawVectorStoreId
+        : null
+      : DEFAULT_VECTOR_STORE_ID;
     if (!isVectorStoreId(vectorStoreId)) {
       response.status(400).json({ error: "Base vetorial inválida." });
       return;

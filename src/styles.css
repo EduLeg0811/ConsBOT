@@ -89,13 +89,13 @@
   --chart-3: oklch(0.86 0.09 95);
   --chart-4: oklch(0.83 0.07 320);
   --chart-5: oklch(0.8 0.08 45);
-  --sidebar: oklch(0.975 0.003 155);
+  --sidebar: oklch(0.975 0 0);
   --sidebar-foreground: oklch(0.3 0.012 245);
   --sidebar-primary: oklch(0.72 0.09 150);
   --sidebar-primary-foreground: oklch(0.22 0.03 155);
-  --sidebar-accent: oklch(0.955 0.005 155);
+  --sidebar-accent: oklch(0.955 0 0);
   --sidebar-accent-foreground: oklch(0.3 0.012 245);
-  --sidebar-border: oklch(0.895 0.004 155);
+  --sidebar-border: oklch(0.895 0 0);
   --sidebar-ring: oklch(0.72 0.09 150);
   --chat-user: oklch(0.86 0.06 150);
   --chat-user-foreground: oklch(0.25 0.035 155);
