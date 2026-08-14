@@ -91,4 +91,10 @@ export function updateAuditLog(id: string, patch: Partial<AuditLog>) {
 export function clearAuditLogs(threadId: string) {
   writeAll(readAll().filter((log) => log.threadId !== threadId));
 }
+
+/** Os logs são estritamente da sessão atual e não sobrevivem a uma recarga. */
+export function clearAllAuditLogs() {
+  if (!isBrowser()) return;
+  window.localStorage.removeItem(AUDIT_LOGS_KEY);
+}
 import type { UIMessage } from "ai";

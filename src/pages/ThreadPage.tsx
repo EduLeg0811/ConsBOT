@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { ChatSidebar, ChatSidebarSheet } from "@/components/ChatSidebar";
@@ -14,6 +13,7 @@ import {
 } from "@/lib/chat-settings";
 import {
   addAuditLog,
+  clearAllAuditLogs,
   type AuditCompletion,
   clearAuditLogs,
   type ConsBotUIMessage,
@@ -25,7 +25,6 @@ import {
   clearAllThreads,
   createThread,
   deleteThread,
-  ensureThread,
   loadThreads,
   saveThreads,
   titleFromMessages,
@@ -34,31 +33,29 @@ import {
 } from "@/lib/chat-store";
 
 export function ThreadPage() {
-  const { threadId } = useParams<{ threadId: string }>();
-  const navigate = useNavigate();
-  const [threads, setThreads] = useState<ChatThread[] | null>(null);
+  const [threads, setThreads] = useState<ChatThread[]>(() => {
+    // Cada abertura começa uma sessão limpa; o histórico anterior nunca é reutilizado.
+    clearAllThreads();
+    clearAllAuditLogs();
+    const thread = createThread();
+    saveThreads([thread]);
+    return [thread];
+  });
+  const [activeId, setActiveId] = useState<string>(() => threads[0]!.id);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
   useEffect(() => {
-    const { threads: list, activeId } = ensureThread(threadId);
-    setThreads(list);
-    if (activeId !== threadId) {
-      navigate(`/c/${activeId}`, { replace: true });
-    }
-  }, [threadId, navigate]);
-
-  useEffect(() => {
-    if (threadId) setAuditLogs(loadAuditLogs(threadId));
-  }, [threadId]);
+    setAuditLogs(loadAuditLogs(activeId));
+  }, [activeId]);
 
   const persist = useCallback((next: ChatThread[]) => {
     setThreads(next);
     saveThreads(next);
   }, []);
 
-  const active = threads?.find((thread) => thread.id === threadId) ?? null;
+  const active = threads.find((thread) => thread.id === activeId) ?? null;
 
-  const goTo = (id: string) => navigate(`/c/${id}`);
+  const goTo = (id: string) => setActiveId(id);
 
   const handleNew = () => {
     const thread = createThread();
@@ -75,7 +72,7 @@ export function ThreadPage() {
       return;
     }
     persist(next);
-    if (id === threadId) goTo(next[0]!.id);
+    if (id === activeId) goTo(next[0]!.id);
   };
 
   const handleClearAll = () => {
@@ -99,39 +96,37 @@ export function ThreadPage() {
 
   const handleAuditStart = useCallback(
     (request: unknown) => {
-      if (!threadId) return "";
       const log: AuditLog = {
         id: crypto.randomUUID(),
-        threadId,
+        threadId: activeId,
         startedAt: Date.now(),
         status: "streaming",
         request,
       };
       addAuditLog(log);
-      setAuditLogs(loadAuditLogs(threadId));
+      setAuditLogs(loadAuditLogs(activeId));
       return log.id;
     },
-    [threadId],
+    [activeId],
   );
 
   const handleAuditComplete = useCallback(
     (id: string, result: AuditCompletion, status: AuditLog["status"] = "complete") => {
-      if (!threadId || !id) return;
+      if (!id) return;
       updateAuditLog(id, { ...result, status, completedAt: Date.now() });
-      setAuditLogs(loadAuditLogs(threadId));
+      setAuditLogs(loadAuditLogs(activeId));
     },
-    [threadId],
+    [activeId],
   );
 
   const handleClearAuditLogs = () => {
-    if (!threadId) return;
-    clearAuditLogs(threadId);
+    clearAuditLogs(activeId);
     setAuditLogs([]);
   };
 
   const handleMessagesChange = useCallback(
     (messages: ConsBotUIMessage[]) => {
-      const current = loadThreads().find((thread) => thread.id === threadId);
+      const current = loadThreads().find((thread) => thread.id === activeId);
       if (!current) return;
       if (current.messages.length === messages.length && messages.length === 0) return;
       const nextTitle =
@@ -148,10 +143,10 @@ export function ThreadPage() {
       };
       persist(upsertThread(loadThreads(), updated));
     },
-    [threadId, persist],
+    [activeId, persist],
   );
 
-  if (!threads || !active || !threadId) {
+  if (!active) {
     return (
       <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
         Carregando conversa...
@@ -161,7 +156,7 @@ export function ThreadPage() {
 
   const sidebarProps = {
     threads,
-    activeId: threadId,
+    activeId,
     settings: active.settings,
     onSettingsChange: handleSettingsChange,
     onSelect: goTo,
@@ -236,8 +231,8 @@ export function ThreadPage() {
         </header>
 
         <ChatWindow
-          key={threadId}
-          threadId={threadId}
+          key={activeId}
+          threadId={activeId}
           settings={active.settings}
           initialMessages={[]}
           onMessagesChange={handleMessagesChange}
