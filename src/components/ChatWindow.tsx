@@ -49,7 +49,7 @@ function isCompletePortugueseSuggestion(value: unknown): value is string {
     suggestion.length >= 16 &&
     suggestion.length <= 120 &&
     suggestion.endsWith("?") &&
-    /^[\p{Script=Latin}\p{Number}\p{Punctuation}\p{Zs}]+$/u.test(suggestion)
+    /^[A-Za-zÀ-ÖØ-öø-ÿ0-9 .,;:!?…'"“”‘’()\[\]{}<>/\\—–-]+$/.test(suggestion)
   );
 }
 

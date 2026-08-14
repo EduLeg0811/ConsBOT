@@ -14,7 +14,7 @@ const suggestionSchema = z
   .trim()
   .min(16)
   .max(120)
-  .regex(/^[\p{Script=Latin}\p{Number}\p{Punctuation}\p{Zs}]+$/u, {
+  .regex(/^[A-Za-zÀ-ÖØ-öø-ÿ0-9 .,;:!?…'"“”‘’()\[\]{}<>/\\—–-]+$/, {
     message: "Use somente caracteres da escrita latina.",
   })
   .regex(/\?$/, { message: "A pergunta deve terminar com ponto de interrogação." })
