@@ -141,7 +141,7 @@ export function ChatWindow({
   const llmParameters = [
     `GPT-5.6 ${activeModel?.label.replace("ConsBOT ", "") ?? "Terra"}`,
     REASONING_LABELS[settings.reasoningEffort],
-    ({ low: "Verb. baixa", medium: "Verb. média", high: "Verb. alta" })[settings.textVerbosity],
+    ({ low: "Low verbosity", medium: "Medium verbosity", high: "High verbosity" })[settings.textVerbosity],
     `${settings.maxOutputTokens} tokens`,
     settings.vectorStoreId === "none" ? "Sem RAG" : activeVectorStore?.label,
     settings.responseFormat === "conscienciological" ? "Confor Conscienciológico" : "Modo livre",

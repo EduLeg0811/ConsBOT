@@ -255,7 +255,15 @@ export function ThreadPage() {
             <div className="lg:hidden">
               <ChatSidebarSheet {...sidebarProps} />
             </div>
-            <img src="/icon.png" alt="Ícone do ConsBOT" className="size-10 shrink-0 object-contain" />
+            <a
+              href="https://www.cons-ia.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              title="Ir para www.cons-ia.org"
+            >
+              <img src="/icon.png" alt="Ícone do ConsBOT" className="size-10 shrink-0 object-contain" />
+            </a>
             <div className="min-w-0 flex-1 lg:flex-none">
               <h1 className="truncate text-lg font-semibold tracking-tight">ConsBOT</h1>
             </div>
