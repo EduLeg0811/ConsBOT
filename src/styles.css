@@ -98,12 +98,10 @@
   --sidebar-ring: oklch(0.72 0.09 150);
   --chat-user: oklch(0.86 0.06 150);
   --chat-user-foreground: oklch(0.25 0.035 155);
-  --gradient-surface: linear-gradient(
-    170deg,
-    oklch(0.985 0.02 145) 0%,
-    oklch(0.975 0.022 190) 55%,
-    oklch(0.98 0.02 95) 100%
-  );
+  --gradient-surface: linear-gradient(170deg,
+      oklch(0.985 0.02 145) 0%,
+      oklch(0.975 0.022 190) 55%,
+      oklch(0.98 0.02 95) 100%);
   --gradient-brand: linear-gradient(120deg, oklch(0.78 0.09 150), oklch(0.82 0.08 200));
   --shadow-soft: 0 10px 30px -18px oklch(0.5 0.06 155 / 0.35);
 }
@@ -181,24 +179,24 @@
   margin-bottom: 0.5rem !important;
 }
 
-.message-response ol > li {
+.message-response ol>li {
   counter-increment: consbot-list-item;
   padding-left: 2rem !important;
   position: relative;
   margin-top: 0 !important;
-  margin-bottom: 0.125rem !important;
-  line-height: 1.35 !important;
+  margin-bottom: 0.05rem !important;
+  line-height: 1.1 !important;
 }
 
-.message-response ol > li > p,
-.message-response ol > li > div {
+.message-response ol>li>p,
+.message-response ol>li>div {
   margin: 0 !important;
   padding: 0 !important;
   line-height: inherit !important;
   display: inline;
 }
 
-.message-response ol > li::before {
+.message-response ol>li::before {
   content: counter(consbot-list-item, decimal) ".";
   left: 0;
   position: absolute;
@@ -208,7 +206,7 @@
   line-height: inherit;
 }
 
-.message-response ol:has(> li:nth-child(10)) > li::before {
+.message-response ol:has(> li:nth-child(10))>li::before {
   content: counter(consbot-list-item, decimal-leading-zero) ".";
 }
 
@@ -220,18 +218,17 @@
   margin-bottom: 0.5rem !important;
 }
 
-.message-response ul > li {
+.message-response ul>li {
   padding-left: 0.15rem !important;
   margin-top: 0 !important;
-  margin-bottom: 0.125rem !important;
-  line-height: 1.35 !important;
+  margin-bottom: 0.05rem !important;
+  line-height: 1.1 !important;
 }
 
-.message-response ul > li > p,
-.message-response ul > li > div {
+.message-response ul>li>p,
+.message-response ul>li>div {
   margin: 0 !important;
   padding: 0 !important;
   line-height: inherit !important;
   display: inline;
 }
-
