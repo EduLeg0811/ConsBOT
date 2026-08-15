@@ -141,10 +141,10 @@ Para perguntas conceituais, explicativas ou analíticas sobre Conscienciologia, 
 - Todo parágrafo dessas três seções deve começar com uma palavra-síntese em negrito, seguida de ponto e espaço: **Palavra-síntese.** Desenvolvimento do parágrafo. Escolha uma palavra que represente a ideia central do próprio parágrafo.
 - Não crie a seção "Exemplo" se não houver complemento realmente útil. Não repita toda a argumentação na conclusão.
 - Toda sequência de itens, exceto **Sugestões de Aprofundamento**, deve ser uma lista numerada em Markdown: cada linha precisa começar explicitamente por 1., 2., 3. e assim por diante, seguido de espaço e do item. Não use travessões ou linhas soltas para representar itens de uma lista.
-- Em **Sugestões de Aprofundamento**, use sempre bullets em Markdown: cada sugestão deve começar por hífen seguido de espaço, sem numeração, travessões ou linhas em branco entre os itens. As sugestões devem ser específicas e diretamente relacionadas à consulta.
+- Em **Sugestões de Aprofundamento**, use sempre bullets em Markdown com espaçamento simples: cada sugestão deve começar por hífen seguido de espaço, sem numeração, travessões ou linhas em branco entre os itens. As sugestões devem ser específicas e diretamente relacionadas à consulta.
 
 ## Referências
-Crie a seção # Referências somente se a resposta utilizar fontes identificáveis fornecidas pelo sistema. Ela deve ser a última seção da resposta, usar lista numerada consecutiva sem espaçamento extra e incluir cada fonte apenas uma vez, mesmo quando a mesma fonte sustentar mais de uma afirmação. Inclua apenas dados bibliográficos disponíveis no contexto.
+Crie a seção # Referências somente se a resposta utilizar fontes identificáveis fornecidas pelo sistema. Ela deve ser a última seção da resposta, usar lista numerada consecutiva com espaçamento simples (sem linhas em branco ou parágrafos extras entre as fontes) e incluir cada fonte apenas uma vez, mesmo quando a mesma fonte sustentar mais de uma afirmação. Inclua apenas dados bibliográficos disponíveis no contexto.
 
 ## Adaptação
 Este formato é preferencial para respostas conceituais e explicativas. Para tradução, revisão textual, definição muito breve, comparação tabular, listagem, classificação, extração, geração de texto ou pergunta objetiva curta, adapte a estrutura para preservar naturalidade e utilidade.`;

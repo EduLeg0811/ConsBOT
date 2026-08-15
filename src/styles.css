@@ -172,21 +172,30 @@
  * Listas padronizadas para respostas de IA (ChatGPT e Conscienciológico)
  * ========================================================================== */
 
-/* Listas ordenadas (ol): numeração alinhada, com zero à esquerda quando >= 10 itens */
+/* Listas ordenadas (ol): numeração alinhada, espaçamento simples e compacto */
 .message-response ol {
   list-style: none !important;
   counter-reset: consbot-list-item;
-  padding-left: 0;
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
+  padding-left: 0 !important;
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.5rem !important;
 }
 
 .message-response ol > li {
   counter-increment: consbot-list-item;
-  padding-left: 2rem;
+  padding-left: 2rem !important;
   position: relative;
-  margin-top: 0.25rem;
-  margin-bottom: 0.25rem;
+  margin-top: 0 !important;
+  margin-bottom: 0.125rem !important;
+  line-height: 1.35 !important;
+}
+
+.message-response ol > li > p,
+.message-response ol > li > div {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: inherit !important;
+  display: inline;
 }
 
 .message-response ol > li::before {
@@ -196,23 +205,33 @@
   text-align: right;
   width: 1.5rem;
   font-variant-numeric: tabular-nums;
+  line-height: inherit;
 }
 
 .message-response ol:has(> li:nth-child(10)) > li::before {
   content: counter(consbot-list-item, decimal-leading-zero) ".";
 }
 
-/* Listas não-ordenadas (ul): marcadores de bullet consistentes */
+/* Listas não-ordenadas (ul): marcadores de bullet, espaçamento simples e compacto */
 .message-response ul {
   list-style-type: disc !important;
-  padding-left: 1.5rem;
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
+  padding-left: 1.25rem !important;
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.5rem !important;
 }
 
 .message-response ul > li {
-  padding-left: 0.25rem;
-  margin-top: 0.25rem;
-  margin-bottom: 0.25rem;
+  padding-left: 0.15rem !important;
+  margin-top: 0 !important;
+  margin-bottom: 0.125rem !important;
+  line-height: 1.35 !important;
+}
+
+.message-response ul > li > p,
+.message-response ul > li > div {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: inherit !important;
+  display: inline;
 }
 

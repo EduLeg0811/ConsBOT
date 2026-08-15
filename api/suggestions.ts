@@ -19,7 +19,7 @@ const suggestionSchema = z
   );
 
 const suggestionsSchema = z.object({
-  suggestions: z.array(suggestionSchema).length(6, "Retorne exatamente seis perguntas."),
+  suggestions: z.array(suggestionSchema).length(4, "Retorne exatamente quatro perguntas."),
 });
 
 function isCompletePortugueseSuggestion(value: string) {
@@ -78,9 +78,9 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       schema: suggestionsSchema,
       schemaName: "perguntas_iniciais",
       schemaDescription:
-        "Um objeto com exatamente seis perguntas distintas, completas e em português brasileiro sobre o corpus da Conscienciologia.",
+        "Um objeto com exatamente quatro perguntas distintas, completas e em português brasileiro sobre o corpus da Conscienciologia.",
       prompt:
-        "Gere exatamente 6 perguntas iniciais relativas ao corpus da Conscienciologia, abordando " +
+        "Gere exatamente 4 perguntas iniciais relativas ao corpus da Conscienciologia, abordando " +
         "temas ou áreas diferentes. Escreva em português do Brasil, em tom natural, claro e direto. " +
         "Distribua as perguntas entre, por exemplo, projeciologia, evolução consciencial, " +
         "tenepes, parapsiquismo, consciencioterapia, cosmoética, pensenologia, energossomatologia " +
@@ -100,7 +100,7 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
     });
 
     if (
-      result.object.suggestions.length !== 6 ||
+      result.object.suggestions.length !== 4 ||
       !result.object.suggestions.every(isCompletePortugueseSuggestion)
     ) {
       response.status(502).json({ error: "A LLM não retornou perguntas sugeridas." });

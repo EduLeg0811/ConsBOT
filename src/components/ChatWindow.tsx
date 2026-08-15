@@ -83,20 +83,41 @@ function getRagStatus(
 }
 
 function normalizeConscienciologicalLists(text: string) {
-  return text.replace(
-    /(^#{1,6}\s+Sugestões de Aprofundamento:?\s*\r?\n+)([\s\S]*?)(?=\r?\n#{1,6}\s|\s*$)/gim,
+  let result = text;
+
+  // Normaliza Sugestões de Aprofundamento (bullets com espaçamento simples, sem quebras extras)
+  result = result.replace(
+    /(^#{1,6}\s*(?:\d+[.)]\s*)?Sugestões\s+(?:de|para)\s+Aprofundamento:?\s*\r?\n+)([\s\S]*?)(?=\r?\n#{1,6}\s|\s*$)/gim,
     (section, heading: string, content: string) => {
       const items = content
         .split(/\r?\n/)
         .map((line) => line.trim())
-        .map((line) => line.replace(/^(?:\d+[.)]|[-*+])\s+/, ""))
+        .map((line) => line.replace(/^(?:\d+[.)]|[-*+•–—])\s*/, "").trim())
         .filter(Boolean);
 
       if (items.length === 0) return section;
 
-      return `${heading}${items.map((item) => `- ${item}`).join("\n")}\n`;
+      return `${heading.trimEnd()}\n${items.map((item) => `- ${item}`).join("\n")}\n\n`;
     },
   );
+
+  // Normaliza Referências / Referências Bibliográficas (lista numerada consecutiva com espaçamento simples)
+  result = result.replace(
+    /(^#{1,6}\s*(?:\d+[.)]\s*)?Referências(?:\s+Bibliográficas)?:?\s*\r?\n+)([\s\S]*?)(?=\r?\n#{1,6}\s|\s*$)/gim,
+    (section, heading: string, content: string) => {
+      const items = content
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .map((line) => line.replace(/^(?:\d+[.)]|[-*+•–—])\s*/, "").trim())
+        .filter(Boolean);
+
+      if (items.length === 0) return section;
+
+      return `${heading.trimEnd()}\n${items.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n\n`;
+    },
+  );
+
+  return result;
 }
 
 type Props = {
@@ -295,7 +316,7 @@ export function ChatWindow({
         model: "gpt-5.6-luna",
         reasoningEffort: "none",
         maxOutputTokens: 512,
-        count: 6,
+        count: 4,
       },
     });
 
@@ -310,8 +331,8 @@ export function ChatWindow({
       const completeSuggestions = Array.isArray(result.suggestions)
         ? result.suggestions.filter(isCompletePortugueseSuggestion)
         : [];
-      if (completeSuggestions.length !== 6) {
-        throw new Error("A LLM não retornou seis perguntas completas em português brasileiro.");
+      if (completeSuggestions.length !== 4) {
+        throw new Error("A LLM não retornou quatro perguntas completas em português brasileiro.");
       }
       setSuggestions(completeSuggestions);
       onAuditComplete(auditId, {
