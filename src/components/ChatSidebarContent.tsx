@@ -92,11 +92,11 @@ export function ChatSidebarContent({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex items-center gap-2 px-3 py-3">
+      <div className="flex h-[60px] items-center justify-center border-b border-border/70 px-3">
         <button
           type="button"
           onClick={onNew}
-          className="group inline-flex items-center gap-2 rounded-md px-1 py-1.5 text-sm font-semibold text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="group inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <Sparkles className="size-4 text-amber-500 transition-transform group-hover:scale-110 group-hover:text-orange-500" />
           Nova conversa
@@ -104,7 +104,7 @@ export function ChatSidebarContent({
       </div>
 
       <TooltipProvider delayDuration={250}>
-        <div className="my-2 flex gap-1 px-3 py-1">
+        <div className="mt-4 mb-2 flex gap-1 px-3 py-1">
           {[
             {
               id: "chats" as const,

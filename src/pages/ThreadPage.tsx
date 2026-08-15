@@ -244,13 +244,13 @@ export function ThreadPage() {
   const currentContainerWidth = CONTAINER_WIDTH_CONFIG[containerWidth];
 
   return (
-    <div className="flex h-screen bg-background text-foreground">
+    <div className="flex h-dvh bg-background text-foreground">
       <ChatSidebar {...sidebarProps} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-border/70">
+        <header className="flex h-[60px] items-center border-b border-border/70">
           <div
             className={cn(
-              "mx-auto flex w-full flex-wrap items-center gap-3 px-4 py-2.5 transition-all duration-300",
+              "mx-auto flex w-full items-center gap-3 px-4 transition-all duration-300",
               currentContainerWidth.className,
             )}
           >
@@ -269,9 +269,38 @@ export function ThreadPage() {
             <div className="min-w-0 flex-1 lg:flex-none">
               <h1 className="truncate text-lg font-semibold tracking-tight">ConsBOT</h1>
             </div>
-            <div className="order-3 flex w-full flex-wrap items-center justify-end gap-2 lg:order-none lg:ml-auto lg:w-auto lg:flex-nowrap">
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={cycleContainerWidth}
+                title={`Largura da tela: ${currentContainerWidth.label}`}
+                aria-label={`Largura da tela: ${currentContainerWidth.label}`}
+                className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Maximize2 className="size-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                title={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+                aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+                className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                {isDark ? <Sun className="size-4" aria-hidden="true" /> : <Moon className="size-4" aria-hidden="true" />}
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className="w-full shrink-0 pt-3 pb-1">
+          <div
+            className={cn(
+              "mx-auto flex w-full justify-end px-4 transition-all duration-300",
+              currentContainerWidth.className,
+            )}
+          >
             <TooltipProvider delayDuration={250}>
-              <div className="flex items-center gap-1" aria-label="Formato da resposta">
+              <div className="flex items-center gap-1.5" aria-label="Formato da resposta">
                 {[
                   {
                     id: "chatgpt",
@@ -315,27 +344,8 @@ export function ThreadPage() {
                 })}
               </div>
             </TooltipProvider>
-              <button
-                type="button"
-                onClick={cycleContainerWidth}
-                title={`Largura da tela: ${currentContainerWidth.label}`}
-                aria-label={`Largura da tela: ${currentContainerWidth.label}`}
-                className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <Maximize2 className="size-4" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onClick={toggleTheme}
-                title={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
-                aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
-                className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                {isDark ? <Sun className="size-4" aria-hidden="true" /> : <Moon className="size-4" aria-hidden="true" />}
-              </button>
-            </div>
           </div>
-        </header>
+        </div>
 
         <ChatWindow
           key={activeId}

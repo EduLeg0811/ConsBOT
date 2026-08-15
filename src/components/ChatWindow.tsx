@@ -569,7 +569,7 @@ export function ChatWindow({
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="pb-5">
+      <div className="pb-9 sm:pb-5">
         <PromptInput
           className="[&_[data-slot=input-group]]:rounded-[28px] [&_[data-slot=input-group]]:border-border/70 [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-[0_3px_14px_-5px_oklch(0.3_0.02_155/0.22)]"
           onSubmit={(message, event) => {
@@ -595,7 +595,7 @@ export function ChatWindow({
             </PromptInputSubmit>
           </div>
         </PromptInput>
-        <p className="mt-2 pr-2 text-right text-[11px] leading-none text-muted-foreground/60">
+        <p className="mt-2 pr-2 text-right text-[11px] leading-relaxed text-muted-foreground/60 sm:leading-none">
           {llmParameters.join("  ●  ")}
         </p>
       </div>
