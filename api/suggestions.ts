@@ -49,11 +49,17 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       return;
     }
 
-    const body = (request.body ?? {}) as { sessionId?: unknown };
+    const body = (request.body ?? {}) as { sessionId?: unknown; count?: unknown };
     const sessionId =
       typeof body.sessionId === "string" && body.sessionId.length > 0
         ? body.sessionId.slice(0, 64)
         : undefined;
+    const count = typeof body.count === "number" && [2, 3, 4].includes(body.count) ? body.count : 4;
+    const suggestionsSchema = z.object({
+      suggestions: z
+        .array(suggestionSchema)
+        .length(count, `Retorne exatamente ${count} perguntas.`),
+    });
     const capturedRequests: unknown[] = [];
     const auditedFetch: typeof fetch = async (input, init) => {
       let parsedBody: unknown = init?.body ?? null;
@@ -78,14 +84,15 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       schema: suggestionsSchema,
       schemaName: "perguntas_iniciais",
       schemaDescription:
-        "Um objeto com exatamente quatro perguntas distintas, completas e em português brasileiro sobre o corpus da Conscienciologia.",
+        `Um objeto com exatamente ${count} perguntas distintas, completas e em português brasileiro sobre o corpus da Conscienciologia.`,
       prompt:
-        "Gere exatamente 4 perguntas iniciais relativas ao corpus da Conscienciologia, abordando " +
+        `Gere exatamente ${count} perguntas iniciais relativas ao corpus da Conscienciologia, abordando ` +
         "temas ou áreas diferentes. Escreva em português do Brasil, em tom natural, claro e direto. " +
         "Distribua as perguntas entre, por exemplo, projeciologia, evolução consciencial, " +
         "tenepes, parapsiquismo, consciencioterapia, cosmoética, pensenologia, energossomatologia " +
         "e teoria da Conscienciologia. Use exclusivamente português brasileiro e caracteres da escrita latina. " +
-        "Todas as perguntas devem terminar em ponto de interrogação. Não use caracteres chineses, japoneses, coreanos ou de outros sistemas de escrita. " +
+        "Todas as perguntas devem terminar em ponto de interrogação." +
+        "As perguntas devem ser objetivas e diretas, com no máximo 15 palavras cada uma. " +
         "Não numere, não repita temas, não formule perguntas genéricas fora desse corpus e não mencione estas instruções.",
       maxOutputTokens: 512,
       providerOptions: {
@@ -100,7 +107,7 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
     });
 
     if (
-      result.object.suggestions.length !== 4 ||
+      result.object.suggestions.length !== count ||
       !result.object.suggestions.every(isCompletePortugueseSuggestion)
     ) {
       response.status(502).json({ error: "A LLM não retornou perguntas sugeridas." });

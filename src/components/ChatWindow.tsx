@@ -19,6 +19,7 @@ import {
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
 import { MODELS, VECTOR_STORES, type ChatSettings } from "@/lib/chat-settings";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type {
   AuditCompletion,
   AuditLog,
@@ -144,6 +145,7 @@ export function ChatWindow({
   onAuditStart,
   onAuditComplete,
 }: Props) {
+  const isMobile = useIsMobile();
   const [input, setInput] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
@@ -308,6 +310,8 @@ export function ChatWindow({
 
   const refreshSuggestions = useCallback(async () => {
     if (isRefreshingSuggestions || isBusy) return;
+    const isMobileView = typeof window !== "undefined" ? window.innerWidth < 768 : isMobile;
+    const expectedCount = isMobileView ? 2 : 4;
     setIsRefreshingSuggestions(true);
     const auditId = onAuditStart({
       endpoint: "/api/suggestions",
@@ -316,7 +320,7 @@ export function ChatWindow({
         model: "gpt-5.6-luna",
         reasoningEffort: "none",
         maxOutputTokens: 512,
-        count: 4,
+        count: expectedCount,
       },
     });
 
@@ -324,15 +328,17 @@ export function ChatWindow({
       const response = await fetch("/api/suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({ sessionId, count: expectedCount }),
       });
       const result = (await response.json()) as SuggestionsResponse;
       if (!response.ok) throw new Error(result.error || "Não foi possível gerar novas perguntas.");
       const completeSuggestions = Array.isArray(result.suggestions)
         ? result.suggestions.filter(isCompletePortugueseSuggestion)
         : [];
-      if (completeSuggestions.length !== 4) {
-        throw new Error("A LLM não retornou quatro perguntas completas em português brasileiro.");
+      if (completeSuggestions.length !== expectedCount) {
+        throw new Error(
+          `A LLM não retornou ${expectedCount === 2 ? "duas" : "quatro"} perguntas completas em português brasileiro.`,
+        );
       }
       setSuggestions(completeSuggestions);
       onAuditComplete(auditId, {
@@ -348,7 +354,7 @@ export function ChatWindow({
     } finally {
       setIsRefreshingSuggestions(false);
     }
-  }, [isBusy, isRefreshingSuggestions, onAuditComplete, onAuditStart, sessionId]);
+  }, [isBusy, isMobile, isRefreshingSuggestions, onAuditComplete, onAuditStart, sessionId]);
 
   const initialSuggestionsRequestedRef = useRef(false);
   useEffect(() => {
@@ -439,21 +445,22 @@ export function ChatWindow({
       className={`mx-auto flex w-full ${containerWidthClass} flex-1 flex-col overflow-hidden px-4 transition-all duration-300`}
     >
       <Conversation className="flex-1">
-        <ConversationContent className="gap-5 pt-12 pb-6">
+        <ConversationContent className="gap-5 pt-4 pb-6 sm:pt-12">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center gap-6 pt-10">
+            <div className="flex flex-col items-center gap-3 pt-0 sm:gap-6 sm:pt-10">
               <ConversationEmptyState
                 icon={
                   <img
                     src="/icon.png"
                     alt=""
-                    className="size-20 object-contain"
+                    className="size-16 sm:size-20 object-contain"
                     aria-hidden="true"
                   />
                 }
                 title="Olá Conscienciólogo!"
                 description="O que você gostaria de conversar hoje?"
                 descriptionClassName="text-[#8a8a8a] italic"
+                className="p-2 sm:p-8 gap-2 sm:gap-3"
               />
               <div className="-mb-3 flex w-full justify-end">
                 <Button
@@ -471,12 +478,12 @@ export function ChatWindow({
               </div>
               {suggestions.length > 0 ? (
                 <div className="grid w-full gap-2 sm:grid-cols-2">
-                  {suggestions.map((suggestion) => (
+                  {suggestions.slice(0, isMobile ? 2 : 4).map((suggestion) => (
                     <button
                       key={suggestion}
                       type="button"
                       onClick={() => submit(suggestion)}
-                      className="rounded-2xl border border-border bg-card/80 px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted"
+                      className="rounded-xl border border-border bg-card/80 px-3.5 py-2 text-left text-xs text-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                     >
                       {suggestion}
                     </button>
