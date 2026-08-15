@@ -295,7 +295,7 @@ export function ChatWindow({
         model: "gpt-5.6-luna",
         reasoningEffort: "none",
         maxOutputTokens: 512,
-        count: 8,
+        count: 6,
       },
     });
 
@@ -310,8 +310,8 @@ export function ChatWindow({
       const completeSuggestions = Array.isArray(result.suggestions)
         ? result.suggestions.filter(isCompletePortugueseSuggestion)
         : [];
-      if (completeSuggestions.length !== 8) {
-        throw new Error("A LLM não retornou oito perguntas completas em português brasileiro.");
+      if (completeSuggestions.length !== 6) {
+        throw new Error("A LLM não retornou seis perguntas completas em português brasileiro.");
       }
       setSuggestions(completeSuggestions);
       onAuditComplete(auditId, {
@@ -418,7 +418,7 @@ export function ChatWindow({
       className={`mx-auto flex w-full ${containerWidthClass} flex-1 flex-col overflow-hidden px-4 transition-all duration-300`}
     >
       <Conversation className="flex-1">
-        <ConversationContent className="gap-5 py-6">
+        <ConversationContent className="gap-5 pt-12 pb-6">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center gap-6 pt-10">
               <ConversationEmptyState

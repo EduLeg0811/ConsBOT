@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
+import { GET as handleAccessLevelGet } from "./api/access-level.ts";
 import { POST as handleChatPost } from "./api/chat.ts";
 import { POST as handleSuggestionsPost } from "./api/suggestions.ts";
 import { GET as handleVectorStoreFilesGet } from "./api/vector-store-files.ts";
@@ -16,8 +17,10 @@ function devApiChatPlugin(): Plugin {
           req.url?.startsWith("/api/suggestions") && req.method === "POST";
         const isSourcesRequest =
           req.url?.startsWith("/api/vector-store-files") && req.method === "GET";
+        const isAccessLevelRequest =
+          req.url?.startsWith("/api/access-level") && req.method === "GET";
 
-        if (isChatRequest || isSuggestionsRequest || isSourcesRequest) {
+        if (isChatRequest || isSuggestionsRequest || isSourcesRequest || isAccessLevelRequest) {
           let bodyStr = "";
           req.on("data", (chunk: Buffer) => {
             bodyStr += chunk.toString();
@@ -26,31 +29,14 @@ function devApiChatPlugin(): Plugin {
             try {
               const env = loadEnv(server.config.mode, process.cwd(), "");
               const apiKey = env["OPENAI_API_KEY"] || process.env["OPENAI_API_KEY"];
-              if (!apiKey) {
-                res.statusCode = 500;
-                res.setHeader("Content-Type", "text/plain; charset=utf-8");
-                res.end("Erro: OPENAI_API_KEY não configurada no arquivo .env");
-                return;
+              if (apiKey) {
+                process.env["OPENAI_API_KEY"] = apiKey;
               }
-              process.env["OPENAI_API_KEY"] = apiKey;
+              if (env["ACCESS_LEVEL"]) {
+                process.env["ACCESS_LEVEL"] = env["ACCESS_LEVEL"];
+              }
 
-              let parsedBody: unknown = {};
-              if (isChatRequest || isSuggestionsRequest) {
-                try {
-                  parsedBody = bodyStr ? (JSON.parse(bodyStr) as unknown) : {};
-                } catch {
-                  res.statusCode = 400;
-                  res.end("JSON inválido");
-                  return;
-                }
-              }
               const query = Object.fromEntries(new URL(`http://localhost${req.url}`).searchParams);
-              const apiRequest = { body: parsedBody, query };
-              const handler = isChatRequest
-                ? handleChatPost
-                : isSuggestionsRequest
-                  ? handleSuggestionsPost
-                  : handleVectorStoreFilesGet;
               const apiResponse = {
                 status(statusCode: number) {
                   res.statusCode = statusCode;
@@ -70,6 +56,35 @@ function devApiChatPlugin(): Plugin {
                   res.end(chunk);
                 },
               };
+
+              if (isAccessLevelRequest) {
+                await handleAccessLevelGet({ query }, apiResponse);
+                return;
+              }
+
+              if (!apiKey) {
+                res.statusCode = 500;
+                res.setHeader("Content-Type", "text/plain; charset=utf-8");
+                res.end("Erro: OPENAI_API_KEY não configurada no arquivo .env");
+                return;
+              }
+
+              let parsedBody: unknown = {};
+              if (isChatRequest || isSuggestionsRequest) {
+                try {
+                  parsedBody = bodyStr ? (JSON.parse(bodyStr) as unknown) : {};
+                } catch {
+                  res.statusCode = 400;
+                  res.end("JSON inválido");
+                  return;
+                }
+              }
+              const apiRequest = { body: parsedBody, query };
+              const handler = isChatRequest
+                ? handleChatPost
+                : isSuggestionsRequest
+                  ? handleSuggestionsPost
+                  : handleVectorStoreFilesGet;
               await handler(apiRequest, apiResponse);
             } catch (err) {
               console.error("Dev API error:", err);

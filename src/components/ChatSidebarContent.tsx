@@ -104,7 +104,7 @@ export function ChatSidebarContent({
       </div>
 
       <TooltipProvider delayDuration={250}>
-        <div className="mt-4 mb-2 flex gap-1 px-3 py-1">
+        <div className="mt-4 mb-2 flex gap-0 px-3 py-1">
           {[
             {
               id: "chats" as const,

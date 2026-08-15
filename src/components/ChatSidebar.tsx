@@ -9,7 +9,7 @@ const MIN_WIDTH = 200;
 const MAX_WIDTH = 500;
 
 export function ChatSidebar(props: ChatSidebarProps) {
-  const [width, setWidth] = useState(250);
+  const [width, setWidth] = useState(270);
   const draggingRef = useRef(false);
 
   const onPointerDown = useCallback(() => {

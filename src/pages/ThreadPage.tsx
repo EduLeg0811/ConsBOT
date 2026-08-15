@@ -51,16 +51,27 @@ export function ThreadPage() {
   const hasManualThemeRef = useRef(false);
   const [threads, setThreads] = useState<ChatThread[]>(() => {
     const loaded = loadThreads();
-    if (loaded.length > 0) return loaded;
+    const existingEmpty = loaded.find((t) => t.messages.length === 0);
+    if (existingEmpty) {
+      const otherThreads = loaded.filter((t) => t.id !== existingEmpty.id);
+      const next = [existingEmpty, ...otherThreads];
+      saveThreads(next);
+      return next;
+    }
     const thread = initialSessionThread ?? createThread();
     initialSessionThread = thread;
-    const next = [thread];
+    const next = [thread, ...loaded];
     saveThreads(next);
     return next;
   });
   const [activeId, setActiveId] = useState<string>(() => threads[0]!.id);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [accessLevel, setAccessLevel] = useState<0 | 1>(0);
+  const [accessLevel, setAccessLevel] = useState<0 | 1>(() => {
+    if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname === "[::1]")) {
+      return 1;
+    }
+    return 0;
+  });
 
   useEffect(() => {
     void fetch("/api/access-level", { headers: { Accept: "application/json" } })
@@ -69,7 +80,14 @@ export function ThreadPage() {
         return (await response.json()) as { accessLevel?: unknown };
       })
       .then((body) => setAccessLevel(body.accessLevel === 1 ? 1 : 0))
-      .catch(() => setAccessLevel(0));
+      .catch(() => {
+        const isLocalhost =
+          typeof window !== "undefined" &&
+          (window.location.hostname === "localhost" ||
+            window.location.hostname === "127.0.0.1" ||
+            window.location.hostname === "[::1]");
+        setAccessLevel(isLocalhost ? 1 : 0);
+      });
   }, []);
 
   useEffect(() => {

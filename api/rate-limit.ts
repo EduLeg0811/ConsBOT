@@ -3,9 +3,9 @@ import { createHash } from "node:crypto";
 const LIMIT_WINDOW_SECONDS = 24 * 60 * 60;
 
 const MODEL_LIMITS: Record<string, number> = {
-  "gpt-5.6-luna": 60,
-  "gpt-5.6-terra": 30,
-  "gpt-5.6-sol": 15,
+  "gpt-5.6-luna": 100,
+  "gpt-5.6-terra": 80,
+  "gpt-5.6-sol": 30,
 };
 
 type RequestWithHeaders = {
