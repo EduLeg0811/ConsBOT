@@ -47,11 +47,12 @@ function normalize(raw: unknown): ChatThread | null {
   )
     ? settings.responseFormat
     : DEFAULT_SETTINGS.responseFormat;
+  const messages = Array.isArray(t.messages) ? (t.messages as UIMessage[]) : [];
   return {
     id: t.id,
     title: typeof t.title === "string" && t.title.trim() ? t.title : "Nova conversa",
     updatedAt: typeof t.updatedAt === "number" ? t.updatedAt : Date.now(),
-    messages: [],
+    messages,
     settings: { ...settings, model, vectorStoreId, responseFormat },
   };
 }
@@ -63,21 +64,10 @@ export function loadThreads(): ChatThread[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    const containedMessages = parsed.some(
-      (thread) =>
-        thread &&
-        typeof thread === "object" &&
-        Array.isArray((thread as Partial<ChatThread>).messages) &&
-        (thread as Partial<ChatThread>).messages!.length > 0,
-    );
-    const threads = parsed
+    return parsed
       .map(normalize)
       .filter((t): t is ChatThread => t !== null)
       .sort((a, b) => b.updatedAt - a.updatedAt);
-    // Migra registros antigos para o formato do histórico lateral, sem texto
-    // de mensagens persistido no navegador.
-    if (containedMessages) saveThreads(threads);
-    return threads;
   } catch {
     return [];
   }
@@ -85,10 +75,7 @@ export function loadThreads(): ChatThread[] {
 
 export function saveThreads(threads: ChatThread[]) {
   if (!isBrowser()) return;
-  // O painel lateral guarda apenas o índice das conversas. As mensagens não
-  // devem sobreviver a uma recarga nem voltar como contexto em outra sessão.
-  const sidebarHistory = threads.map((thread) => ({ ...thread, messages: [] as UIMessage[] }));
-  window.localStorage.setItem(THREADS_KEY, JSON.stringify(sidebarHistory));
+  window.localStorage.setItem(THREADS_KEY, JSON.stringify(threads));
 }
 
 export function createThread(): ChatThread {

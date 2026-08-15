@@ -194,6 +194,7 @@ export function ChatWindow({
   const { messages, sendMessage, status, stop, setMessages, regenerate } =
     useChat<ConsBotUIMessage>({
       id: threadId,
+      messages: initialMessages,
       transport,
       onData: (part) => {
         if (part.type === "data-openaiAudit") openaiAuditRef.current = part.data;
@@ -215,7 +216,9 @@ export function ChatWindow({
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
-    if (initialMessages.length > 0) setMessages(initialMessages);
+    if (initialMessages.length > 0) {
+      setMessages(initialMessages);
+    }
   }, [initialMessages, setMessages]);
 
   const isBusy = status === "submitted" || status === "streaming";

@@ -50,11 +50,11 @@ export function ThreadPage() {
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
   const hasManualThemeRef = useRef(false);
   const [threads, setThreads] = useState<ChatThread[]>(() => {
-    // Cada abertura inicia uma conversa nova, mantendo somente a listagem anterior.
-    clearAllAuditLogs();
+    const loaded = loadThreads();
+    if (loaded.length > 0) return loaded;
     const thread = initialSessionThread ?? createThread();
     initialSessionThread = thread;
-    const next = upsertThread(loadThreads(), thread);
+    const next = [thread];
     saveThreads(next);
     return next;
   });
@@ -197,24 +197,26 @@ export function ThreadPage() {
 
   const handleMessagesChange = useCallback(
     (messages: ConsBotUIMessage[]) => {
-      const current = loadThreads().find((thread) => thread.id === activeId);
-      if (!current) return;
-      if (current.messages.length === messages.length && messages.length === 0) return;
-      const nextTitle =
-        current.title === "Nova conversa"
-          ? (titleFromMessages(messages) ?? current.title)
-          : current.title;
-      const updated: ChatThread = {
-        ...current,
-        // As mensagens são apenas o estado temporário da tela atual. No
-        // histórico persistente ficam título, data e configurações.
-        messages: [],
-        title: nextTitle,
-        updatedAt: messages.length > 0 ? Date.now() : current.updatedAt,
-      };
-      persist(upsertThread(loadThreads(), updated));
+      setThreads((prevThreads) => {
+        const current = prevThreads.find((thread) => thread.id === activeId);
+        if (!current) return prevThreads;
+        if (current.messages.length === messages.length && messages.length === 0) return prevThreads;
+        const nextTitle =
+          current.title === "Nova conversa"
+            ? (titleFromMessages(messages) ?? current.title)
+            : current.title;
+        const updated: ChatThread = {
+          ...current,
+          messages,
+          title: nextTitle,
+          updatedAt: messages.length > 0 ? Date.now() : current.updatedAt,
+        };
+        const next = upsertThread(prevThreads, updated);
+        saveThreads(next);
+        return next;
+      });
     },
-    [activeId, persist],
+    [activeId],
   );
 
   if (!active) {
@@ -340,7 +342,7 @@ export function ThreadPage() {
           threadId={activeId}
           settings={effectiveSettings}
           containerWidthClass={currentContainerWidth.className}
-          initialMessages={[]}
+          initialMessages={(active?.messages as ConsBotUIMessage[]) ?? []}
           onMessagesChange={handleMessagesChange}
           onAuditStart={handleAuditStart}
           onAuditComplete={handleAuditComplete}
