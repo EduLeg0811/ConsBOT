@@ -92,7 +92,7 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
         "tenepes, parapsiquismo, consciencioterapia, cosmoética, pensenologia, energossomatologia " +
         "e teoria da Conscienciologia. Use exclusivamente português brasileiro e caracteres da escrita latina. " +
         "Todas as perguntas devem terminar em ponto de interrogação." +
-        "As perguntas devem ser objetivas e diretas, com no máximo 15 palavras cada uma. " +
+        "As perguntas devem ser objetivas e diretas, com no máximo 12 palavras cada uma. " +
         "Não numere, não repita temas, não formule perguntas genéricas fora desse corpus e não mencione estas instruções.",
       maxOutputTokens: 512,
       providerOptions: {
