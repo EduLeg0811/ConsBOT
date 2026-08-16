@@ -39,6 +39,7 @@ const REASONING_LABELS: Record<ChatSettings["reasoningEffort"], string> = {
 
 type SuggestionsResponse = {
   suggestions?: string[];
+  themes?: string[];
   audit?: { request?: unknown; response?: unknown };
   error?: string;
 };
@@ -351,6 +352,7 @@ export function ChatWindow({
     }
   }, [searchParams, setSearchParams, submit]);
 
+  const previousThemesRef = useRef<string[]>([]);
   const refreshSuggestions = useCallback(async () => {
     if (isRefreshingSuggestions || isBusy) return;
     const isMobileView = typeof window !== "undefined" ? window.innerWidth < 768 : isMobile;
@@ -364,6 +366,7 @@ export function ChatWindow({
         reasoningEffort: "none",
         maxOutputTokens: 512,
         count: expectedCount,
+        previousThemes: previousThemesRef.current,
       },
     });
 
@@ -371,7 +374,11 @@ export function ChatWindow({
       const response = await fetch("/api/suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ sessionId, count: expectedCount }),
+        body: JSON.stringify({
+          sessionId,
+          count: expectedCount,
+          previousThemes: previousThemesRef.current,
+        }),
       });
       const result = (await response.json()) as SuggestionsResponse;
       if (!response.ok) throw new Error(result.error || "Não foi possível gerar novas perguntas.");
@@ -382,6 +389,12 @@ export function ChatWindow({
         throw new Error(
           `A LLM não retornou ${expectedCount === 2 ? "duas" : "quatro"} perguntas completas em português brasileiro.`,
         );
+      }
+      if (Array.isArray(result.themes) && result.themes.length > 0) {
+        const validThemes = result.themes.filter(
+          (t): t is string => typeof t === "string" && Boolean(t.trim()),
+        );
+        previousThemesRef.current = [...previousThemesRef.current, ...validThemes].slice(-30);
       }
       setSuggestions(completeSuggestions);
       onAuditComplete(auditId, {
