@@ -35,7 +35,7 @@ import {
 
 const CONTAINER_WIDTHS = ["5xl", "6xl", "7xl", "full"] as const;
 type ContainerWidth = (typeof CONTAINER_WIDTHS)[number];
-// Evita duas novas conversas causadas pela dupla inicialização do StrictMode em desenvolvimento.
+// Evita duas novas conversas causadas pela dupla inicialização do StrictMode em desenvolvimento...
 let initialSessionThread: ChatThread | null = null;
 
 const CONTAINER_WIDTH_CONFIG: Record<ContainerWidth, { className: string; label: string }> = {
