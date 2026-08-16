@@ -118,10 +118,10 @@ export function ThreadPage() {
     ? isAdmin
       ? active.settings
       : {
-          ...DEFAULT_SETTINGS,
-          responseFormat: active.settings.responseFormat,
-          systemPrompt: active.settings.systemPrompt,
-        }
+        ...DEFAULT_SETTINGS,
+        responseFormat: active.settings.responseFormat,
+        systemPrompt: active.settings.systemPrompt,
+      }
     : DEFAULT_SETTINGS;
 
   const goTo = (id: string) => setActiveId(id);
@@ -176,10 +176,10 @@ export function ThreadPage() {
     const nextSettings = isAdmin
       ? settings
       : {
-          ...DEFAULT_SETTINGS,
-          responseFormat: settings.responseFormat,
-          systemPrompt: settings.systemPrompt,
-        };
+        ...DEFAULT_SETTINGS,
+        responseFormat: settings.responseFormat,
+        systemPrompt: settings.systemPrompt,
+      };
     persist(upsertThread(threads ?? [], { ...active, settings: nextSettings, updatedAt: active.updatedAt }));
   };
 
@@ -279,14 +279,25 @@ export function ThreadPage() {
               href="https://www.cons-ia.org"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex shrink-0 items-center rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="group flex min-w-0 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label="Página inicial do ConsBOT"
               title="Ir para www.cons-ia.org"
             >
-              <img src="/icon.png" alt="Ícone do ConsBOT" className="size-10 shrink-0 object-contain" />
+              <img
+                src="/icon.png"
+                alt="ConsBOT"
+                className="h-12 w-12 shrink-0 object-contain transition-transform duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_8px_color-mix(in_oklch,var(--primary)_40%,transparent)]"
+              />
+              <span className="flex min-w-0 items-center gap-2">
+                <h1 className="max-w-[14rem] truncate font-nunito text-2xl font-semibold tracking-tight text-foreground sm:max-w-none">
+                  Cons<em className="italic text-primary">BOT</em>
+                </h1>
+                <span className="hidden h-4 w-px bg-border sm:inline" />
+                <span className="hidden text-[10px] uppercase tracking-[0.22em] text-muted-foreground sm:inline">
+                  Assistente de IA da Conscienciologia
+                </span>
+              </span>
             </a>
-            <div className="min-w-0 flex-1 lg:flex-none">
-              <h1 className="truncate text-lg font-semibold tracking-tight">ConsBOT</h1>
-            </div>
             <div className="ml-auto flex items-center gap-2">
               <button
                 type="button"

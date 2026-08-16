@@ -37,6 +37,14 @@ const REASONING_LABELS: Record<ChatSettings["reasoningEffort"], string> = {
   max: "Máximo",
 };
 
+const SECTION_TITLES = [
+  "Apps IA",
+  "Bibliografia IA",
+  "Bots IA",
+  "Busca IA",
+  "Links Externos",
+];
+
 type SuggestionsResponse = {
   suggestions?: string[];
   audit?: { request?: unknown; response?: unknown };
@@ -491,21 +499,28 @@ export function ChatWindow({
       <Conversation className="flex-1">
         <ConversationContent className="gap-5 pt-4 pb-6 sm:pt-12">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 pt-0 sm:gap-6 sm:pt-10">
-              <ConversationEmptyState
-                icon={
-                  <img
-                    src="/icon.png"
-                    alt=""
-                    className="size-16 sm:size-20 object-contain"
-                    aria-hidden="true"
-                  />
-                }
+            <div className="flex flex-col items-center gap-3 pt-0 sm:gap-6 sm:pt-4">
+              <div className="flex flex-col items-center gap-2 text-center">
+                {/* Exemplo: 26px no mobile e 40px no desktop */}
+                <h2 className="font-display text-[26px] font-normal leading-[1.02] text-foreground sm:text-[40px] sm:leading-[1.05]">
+                  Inteligência Artificial
+                  <br />
+                  <span className="italic text-primary/80">a serviço da Consciência</span>
+                </h2>
+                {/* <h2 className="font-display text-3xl font-normal leading-[1.02] text-foreground sm:text-5xl sm:leading-[1.05]">
+                  Inteligência Artificial
+                  <br />
+                  <span className="italic text-primary/80">a serviço da Consciência</span>
+                </h2> */}
+
+              </div>
+
+              {/* <ConversationEmptyState
                 title="Olá Conscienciólogo!"
                 description="O que você gostaria de conversar hoje?"
                 descriptionClassName="text-[#8a8a8a] italic"
-                className="p-2 sm:p-8 gap-2 sm:gap-3"
-              />
+                className="gap-2 p-2 sm:gap-3 sm:p-4"
+              /> */}
               {!hasInitialUrlQuestion.current ? (
                 <>
                   <div className="-mb-3 flex w-full justify-end">
