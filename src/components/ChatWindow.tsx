@@ -1,6 +1,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ArrowUp, Copy, Database, RefreshCw, Share2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -146,7 +147,16 @@ export function ChatWindow({
   onAuditComplete,
 }: Props) {
   const isMobile = useIsMobile();
-  const [input, setInput] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [input, setInput] = useState(() => {
+    const query =
+      searchParams.get("question") ||
+      searchParams.get("q") ||
+      searchParams.get("prompt") ||
+      searchParams.get("pergunta") ||
+      "";
+    return query.trim();
+  });
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
   const [sourceCounts, setSourceCounts] = useState<Record<string, number>>({});
@@ -255,8 +265,35 @@ export function ChatWindow({
   }, [messages, isBusy]);
 
   useEffect(() => {
-    if (!isBusy) textareaRef.current?.focus();
-  }, [isBusy, threadId]);
+    const query =
+      searchParams.get("question") ||
+      searchParams.get("q") ||
+      searchParams.get("prompt") ||
+      searchParams.get("pergunta");
+
+    if (query) {
+      const trimmed = query.trim();
+      if (trimmed) {
+        setInput(trimmed);
+      }
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("question");
+      nextParams.delete("q");
+      nextParams.delete("prompt");
+      nextParams.delete("pergunta");
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!isBusy) {
+      textareaRef.current?.focus();
+      if (textareaRef.current && input) {
+        const len = textareaRef.current.value.length;
+        textareaRef.current.setSelectionRange(len, len);
+      }
+    }
+  }, [isBusy, threadId, input]);
 
   useEffect(() => {
     if (isBusy || !pendingAuditId.current) return;
