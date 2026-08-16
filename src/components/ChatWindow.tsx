@@ -159,15 +159,7 @@ export function ChatWindow({
       ).trim(),
     ),
   );
-  const [input, setInput] = useState(() => {
-    const query =
-      searchParams.get("question") ||
-      searchParams.get("q") ||
-      searchParams.get("prompt") ||
-      searchParams.get("pergunta") ||
-      "";
-    return query.trim();
-  });
+  const [input, setInput] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
   const [sourceCounts, setSourceCounts] = useState<Record<string, number>>({});
@@ -175,6 +167,7 @@ export function ChatWindow({
   const pendingAuditId = useRef<string | null>(null);
   const openaiAuditRef = useRef<OpenAIAuditEvent | null>(null);
   const auditCompleteRef = useRef(onAuditComplete);
+  const initialUrlQuestionProcessedRef = useRef(false);
   auditCompleteRef.current = onAuditComplete;
 
   const settingsRef = useRef(settings);
@@ -276,27 +269,6 @@ export function ChatWindow({
   }, [messages, isBusy]);
 
   useEffect(() => {
-    const query =
-      searchParams.get("question") ||
-      searchParams.get("q") ||
-      searchParams.get("prompt") ||
-      searchParams.get("pergunta");
-
-    if (query) {
-      const trimmed = query.trim();
-      if (trimmed) {
-        setInput(trimmed);
-      }
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete("question");
-      nextParams.delete("q");
-      nextParams.delete("prompt");
-      nextParams.delete("pergunta");
-      setSearchParams(nextParams, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
-
-  useEffect(() => {
     if (!isBusy) {
       textareaRef.current?.focus();
       if (textareaRef.current && input) {
@@ -355,6 +327,29 @@ export function ChatWindow({
     },
     [isBusy, messages, onAuditStart, sendMessage, sessionId],
   );
+
+  useEffect(() => {
+    const query =
+      searchParams.get("question") ||
+      searchParams.get("q") ||
+      searchParams.get("prompt") ||
+      searchParams.get("pergunta");
+
+    if (query) {
+      const trimmed = query.trim();
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("question");
+      nextParams.delete("q");
+      nextParams.delete("prompt");
+      nextParams.delete("pergunta");
+      setSearchParams(nextParams, { replace: true });
+
+      if (trimmed && !initialUrlQuestionProcessedRef.current) {
+        initialUrlQuestionProcessedRef.current = true;
+        submit(trimmed);
+      }
+    }
+  }, [searchParams, setSearchParams, submit]);
 
   const refreshSuggestions = useCallback(async () => {
     if (isRefreshingSuggestions || isBusy) return;
