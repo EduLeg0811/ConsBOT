@@ -148,6 +148,17 @@ export function ChatWindow({
 }: Props) {
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
+  const hasInitialUrlQuestion = useRef(
+    Boolean(
+      (
+        searchParams.get("question") ||
+        searchParams.get("q") ||
+        searchParams.get("prompt") ||
+        searchParams.get("pergunta") ||
+        ""
+      ).trim(),
+    ),
+  );
   const [input, setInput] = useState(() => {
     const query =
       searchParams.get("question") ||
@@ -397,6 +408,7 @@ export function ChatWindow({
   useEffect(() => {
     if (
       initialSuggestionsRequestedRef.current ||
+      hasInitialUrlQuestion.current ||
       isBusy ||
       messages.length > 0 ||
       initialMessages.length > 0
@@ -499,33 +511,37 @@ export function ChatWindow({
                 descriptionClassName="text-[#8a8a8a] italic"
                 className="p-2 sm:p-8 gap-2 sm:gap-3"
               />
-              <div className="-mb-3 flex w-full justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="rounded-full text-muted-foreground/70 hover:bg-primary/10 hover:text-primary"
-                  aria-label="Gerar novas perguntas iniciais"
-                  title="Gerar novas perguntas"
-                  onClick={() => void refreshSuggestions()}
-                  disabled={isRefreshingSuggestions || isBusy}
-                >
-                  <RefreshCw className={isRefreshingSuggestions ? "animate-spin" : undefined} />
-                </Button>
-              </div>
-              {suggestions.length > 0 ? (
-                <div className="grid w-full gap-2 sm:grid-cols-2">
-                  {suggestions.slice(0, isMobile ? 2 : 4).map((suggestion) => (
-                    <button
-                      key={suggestion}
+              {!hasInitialUrlQuestion.current ? (
+                <>
+                  <div className="-mb-3 flex w-full justify-end">
+                    <Button
                       type="button"
-                      onClick={() => submit(suggestion)}
-                      className="rounded-xl border border-border bg-card/80 px-3.5 py-2 text-left text-xs text-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="rounded-full text-muted-foreground/70 hover:bg-primary/10 hover:text-primary"
+                      aria-label="Gerar novas perguntas iniciais"
+                      title="Gerar novas perguntas"
+                      onClick={() => void refreshSuggestions()}
+                      disabled={isRefreshingSuggestions || isBusy}
                     >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
+                      <RefreshCw className={isRefreshingSuggestions ? "animate-spin" : undefined} />
+                    </Button>
+                  </div>
+                  {suggestions.length > 0 ? (
+                    <div className="grid w-full gap-2 sm:grid-cols-2">
+                      {suggestions.slice(0, isMobile ? 2 : 4).map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => submit(suggestion)}
+                          className="rounded-xl border border-border bg-card/80 px-3.5 py-2 text-left text-xs text-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
               ) : null}
             </div>
           ) : null}
