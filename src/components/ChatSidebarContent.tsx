@@ -92,7 +92,7 @@ export function ChatSidebarContent({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex h-[60px] items-center justify-center border-b border-border/70 px-3">
+      <div className="flex h-16 items-center justify-center border-b border-border/70 px-3">
         <button
           type="button"
           onClick={onNew}
