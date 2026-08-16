@@ -289,11 +289,11 @@ export function ThreadPage() {
                 className="h-12 w-12 shrink-0 object-contain transition-transform duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_8px_color-mix(in_oklch,var(--primary)_40%,transparent)]"
               />
               <span className="flex min-w-0 items-center gap-2">
-                <h1 className="max-w-[14rem] truncate font-nunito text-xl font-semibold tracking-tight text-foreground sm:max-w-none">
-                  Cons<em className="ml-[2px] italic text-primary">BOT</em>
+                <h1 className="max-w-[14rem] truncate font-nunito text-xl font-normal tracking-tight text-foreground sm:max-w-none">
+                  Cons<em className="ml-[4px] italic text-primary">BOT</em>
                 </h1>
 
-                <span className="hidden h-4 w-px bg-border sm:inline" />
+                <span className="hidden h-4 w-px bg-border sm:inline mx-1" />
                 <span className="hidden text-[10px] uppercase tracking-[0.22em] text-muted-foreground sm:inline">
                   Assistente de IA da Conscienciologia
                 </span>
