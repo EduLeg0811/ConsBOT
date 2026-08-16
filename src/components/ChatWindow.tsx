@@ -37,14 +37,6 @@ const REASONING_LABELS: Record<ChatSettings["reasoningEffort"], string> = {
   max: "Máximo",
 };
 
-const SECTION_TITLES = [
-  "Apps IA",
-  "Bibliografia IA",
-  "Bots IA",
-  "Busca IA",
-  "Links Externos",
-];
-
 type SuggestionsResponse = {
   suggestions?: string[];
   audit?: { request?: unknown; response?: unknown };
@@ -507,20 +499,9 @@ export function ChatWindow({
                   <br />
                   <span className="italic text-primary/80">a serviço da Consciência</span>
                 </h2>
-                {/* <h2 className="font-display text-3xl font-normal leading-[1.02] text-foreground sm:text-5xl sm:leading-[1.05]">
-                  Inteligência Artificial
-                  <br />
-                  <span className="italic text-primary/80">a serviço da Consciência</span>
-                </h2> */}
-
               </div>
 
-              {/* <ConversationEmptyState
-                title="Olá Conscienciólogo!"
-                description="O que você gostaria de conversar hoje?"
-                descriptionClassName="text-[#8a8a8a] italic"
-                className="gap-2 p-2 sm:gap-3 sm:p-4"
-              /> */}
+
               {!hasInitialUrlQuestion.current ? (
                 <>
                   <div className="-mb-3 flex w-full justify-end">
@@ -673,7 +654,7 @@ export function ChatWindow({
             value={input}
             onChange={(event) => setInput(event.target.value)}
             className="field-sizing-content max-h-48 min-h-14 resize-none bg-transparent px-5 py-4 text-base"
-            placeholder="Pergunte ao ConsBOT"
+            placeholder="Olá Conscienciólogo! O que você gostaria de conversar hoje?"
           />
           <div className="flex shrink-0 items-center pr-2">
             <PromptInputSubmit

@@ -49,12 +49,26 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
       return;
     }
 
-    const body = (request.body ?? {}) as { sessionId?: unknown; count?: unknown };
+    const body = (request.body ?? {}) as {
+      sessionId?: unknown;
+      count?: unknown;
+      previousQuestions?: unknown;
+      exclude?: unknown;
+    };
     const sessionId =
       typeof body.sessionId === "string" && body.sessionId.length > 0
         ? body.sessionId.slice(0, 64)
         : undefined;
     const count = typeof body.count === "number" && [2, 3, 4].includes(body.count) ? body.count : 4;
+
+    const previousList = Array.isArray(body.previousQuestions ?? body.exclude)
+      ? ((body.previousQuestions ?? body.exclude) as unknown[])
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(-20)
+      : [];
+
     const suggestionsSchema = z.object({
       suggestions: z
         .array(suggestionSchema)
@@ -79,21 +93,33 @@ export async function POST(request: VercelRequest, response: VercelResponse) {
     };
     const openai = createOpenAI({ apiKey, fetch: auditedFetch });
 
+    const previousContext =
+      previousList.length > 0
+        ? `\nPerguntas anteriores já feitas nesta sessão (não repita nenhuma):\n${previousList
+          .map((q) => `- ${q}`)
+          .join("\n")}\n`
+        : "";
+
+    const prompt =
+      `Gere exatamente ${count} perguntas de sugestão sobre o corpus da Conscienciologia seguindo estritamente estas diretrizes:\n\n` +
+      `- Alterne e varie os temas das perguntas a cada geração.\n` +
+      `- Não repita temas entre as perguntas.\n` +
+      `- Não repita perguntas feitas anteriormente.\n` +
+      `- Gere perguntas com no máximo 10 palavras cada uma.\n` +
+      `- Escreva em português do Brasil, de forma clara, natural e terminando com ponto de interrogação.\n` +
+      `- Não faça perguntas muito fechadas ou que possam ser respondidas com sim ou não.\n` +
+      `- Prefira usar termos e jargões conscienciologicos.\n` +
+
+
+      previousContext;
+
     const result = await generateObject({
       model: openai.responses("gpt-5.6-luna"),
       schema: suggestionsSchema,
       schemaName: "perguntas_iniciais",
       schemaDescription:
-        `Um objeto com exatamente ${count} perguntas distintas, completas e em português brasileiro sobre o corpus da Conscienciologia.`,
-      prompt:
-        `Gere exatamente ${count} perguntas iniciais relativas ao corpus da Conscienciologia, abordando ` +
-        "temas ou áreas diferentes. Escreva em português do Brasil, em tom natural, claro e direto. " +
-        "Distribua as perguntas entre, por exemplo, projeciologia, evolução consciencial, " +
-        "tenepes, parapsiquismo, consciencioterapia, cosmoética, pensenologia, energossomatologia " +
-        "e teoria da Conscienciologia. Use exclusivamente português brasileiro e caracteres da escrita latina. " +
-        "Todas as perguntas devem terminar em ponto de interrogação." +
-        "As perguntas devem ser objetivas e diretas, com no máximo 12 palavras cada uma. " +
-        "Não numere, não repita temas, não formule perguntas genéricas fora desse corpus e não mencione estas instruções.",
+        `Um objeto com exatamente ${count} perguntas de sugestão sobre Conscienciologia, com temas variados e no máximo 12 palavras.`,
+      prompt,
       maxOutputTokens: 512,
       providerOptions: {
         openai: {
