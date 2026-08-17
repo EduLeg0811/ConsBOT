@@ -10,6 +10,6 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_MAIN_SERVER_URL
-        value: https://main-server-vvna.onrender.com
+        value: https://main-server-vim3.onrender.com
       - key: VITE_ACCESS_LEVEL
         value: "0"
