@@ -248,8 +248,11 @@
   display: inline;
 }
 
-/* Destaque mais forte para negrito em respostas do chat */
+/* Destaque mais forte para negrito em respostas do chat e global */
 .message-response strong,
-.message-response b {
-  font-weight: 900;
+.message-response b,
+strong,
+b {
+  font-weight: 900 !important;
+  font-variation-settings: "wght" 900;
 }
