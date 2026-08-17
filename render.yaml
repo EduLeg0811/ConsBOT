@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: consbot-fe
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_MAIN_SERVER_URL
+        value: https://main-server-vvna.onrender.com
+      - key: VITE_ACCESS_LEVEL
+        value: "0"

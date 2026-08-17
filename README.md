@@ -52,8 +52,17 @@ Abra [http://localhost:5173](http://localhost:5173) no seu navegador.
 npm run build
 ```
 
-### Deploy
+### Deploy no Render (Static Site)
 
-1. Publique este repositório como site estático (Vercel, Render, etc.) — é
-   puro frontend, sem função serverless própria.
-2. Defina `VITE_MAIN_SERVER_URL` apontando para a URL pública do Main-Server.
+1. Crie um novo **Static Site** no [Render Dashboard](https://dashboard.render.com/) conectado a este repositório (ou use o Blueprint automático via `render.yaml`).
+2. Configurações:
+   - **Build Command:** `npm install && npm run build`
+   - **Publish Directory:** `dist`
+3. Variáveis de Ambiente (**Environment Variables**):
+   - `VITE_MAIN_SERVER_URL`: `https://main-server-vvna.onrender.com`
+   - `VITE_ACCESS_LEVEL`: `0` (ou `1` para habilitar opções avançadas de admin)
+4. Redirecionamento SPA (**Redirects / Rewrites**):
+   - Type: `Rewrite`
+   - Source: `/*`
+   - Destination: `/index.html`
+
