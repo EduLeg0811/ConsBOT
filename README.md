@@ -59,7 +59,7 @@ npm run build
    - **Build Command:** `npm install && npm run build`
    - **Publish Directory:** `dist`
 3. Variáveis de Ambiente (**Environment Variables**):
-   - `VITE_MAIN_SERVER_URL`: `https://main-server-vvna.onrender.com`
+   - `VITE_MAIN_SERVER_URL`: `https://main-server-vim3.onrender.com`
    - `VITE_ACCESS_LEVEL`: `0` (ou `1` para habilitar opções avançadas de admin)
 4. Redirecionamento SPA (**Redirects / Rewrites**):
    - Type: `Rewrite`
