@@ -251,8 +251,8 @@ export function allowedVectorStoreId(id: VectorStoreId, isAdmin: boolean): Vecto
  * tamanho; estas linhas dão o limite explícito em parágrafos. */
 export const VERBOSITY_INSTRUCTIONS: Record<TextVerbosity, string> = {
   low: "Produza resposta concisa e objetiva, com no máximo 10 parágrafos.",
-  medium: "Produza resposta suficiente e objetiva, sem ser prolixa, com no máximo 14 parágrafos.",
-  high: "Produza resposta aprofundada, porém objetiva e sem ser prolixa, com no máximo 20 parágrafos.",
+  medium: "Produza resposta suficiente e objetiva, sem ser prolixa, com no máximo 20 parágrafos.",
+  high: "Produza resposta bem fundamentada e detalhada, porém objetiva e sem ser prolixa, com no máximo 30 parágrafos.",
 };
 
 /** O `systemPrompt` que vai na requisição: o da conversa mais a linha da
