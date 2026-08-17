@@ -288,3 +288,16 @@
   line-height: inherit !important;
   display: inline;
 }
+
+/* Destaque extra forte (900) apenas para negritos dentro do texto do chat */
+.message-response strong,
+.message-response b {
+  font-weight: 900 !important;
+  font-variation-settings: "wght" 900;
+  color: oklch(0.16 0.04 155);
+}
+
+.dark .message-response strong,
+.dark .message-response b {
+  color: oklch(0.98 0.01 155);
+}
