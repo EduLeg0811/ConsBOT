@@ -614,7 +614,7 @@ export function ChatWindow({
                           key={suggestion}
                           type="button"
                           onClick={() => submit(suggestion)}
-                          className="rounded-xl border border-border bg-card/80 px-3.5 py-2 text-left text-xs text-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                          className="rounded-xl border border-border bg-card/80 px-3.5 py-2 text-left text-xs font-chat text-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                         >
                           {suggestion}
                         </button>
@@ -651,7 +651,7 @@ export function ChatWindow({
                         return (
                           <details
                             key={`${message.id}-r-${index}`}
-                            className="mb-2 rounded-xl border border-border/70 bg-secondary/60 px-3 py-2 text-xs text-muted-foreground"
+                            className="mb-2 rounded-xl border border-border/70 bg-secondary/60 px-3 py-2 text-xs font-chat text-muted-foreground"
                           >
                             <summary className="cursor-pointer font-medium">Raciocínio</summary>
                             <div className="mt-2 whitespace-pre-wrap">{part.text}</div>
@@ -747,7 +747,7 @@ export function ChatWindow({
             ref={textareaRef}
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            className="field-sizing-content max-h-48 min-h-14 resize-none bg-transparent px-5 py-4 text-base"
+            className="field-sizing-content max-h-48 min-h-14 resize-none bg-transparent px-5 py-4 text-base font-chat"
             placeholder="Olá Conscienciólogo! O que você gostaria de conversar hoje?"
           />
           <div className="flex shrink-0 items-center pr-2">

@@ -22,6 +22,7 @@
   --font-nunito: "Nunito", "Nunito Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   --font-nunito-sans: "Nunito Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   --font-display: "Lora", Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-chat: "Nunito Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 @utility font-nunito {
@@ -29,6 +30,10 @@
 }
 
 @utility font-nunito-sans {
+  font-family: "Nunito Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+@utility font-chat {
   font-family: "Nunito Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
@@ -177,8 +182,44 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
     transition: background-color 200ms ease, color 200ms ease;
   }
+}
+
+/* ==========================================================================
+ * Família de fontes para os textos do chat
+ * ========================================================================== */
+.message-response,
+.message-content {
+  font-family: var(--font-chat);
+}
+
+/* ==========================================================================
+ * Destaque ultra forte para negritos (**) no texto do chat
+ * ========================================================================== */
+.message-response strong,
+.message-response b,
+.message-response * strong,
+.message-response * b,
+.message-content strong,
+.message-content b {
+  font-weight: 900 !important;
+  font-variation-settings: "wght" 1000, "opsz" 12;
+  -webkit-text-stroke: 0.55px currentColor;
+  text-shadow: 0 0 0.4px currentColor;
+  color: #000000 !important;
+}
+
+.dark .message-response strong,
+.dark .message-response b,
+.dark .message-response * strong,
+.dark .message-response * b,
+.dark .message-content strong,
+.dark .message-content b {
+  color: #ffffff !important;
+  -webkit-text-stroke: 0.55px currentColor;
+  text-shadow: 0 0 0.4px currentColor;
 }
 
 /* ==========================================================================
