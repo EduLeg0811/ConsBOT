@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: consbot-fe
+    name: consbot
     runtime: static
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
