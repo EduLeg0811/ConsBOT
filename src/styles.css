@@ -248,11 +248,15 @@
   display: inline;
 }
 
-/* Destaque mais forte para negrito em respostas do chat e global */
+/* Destaque extra forte (900) apenas para negritos dentro do texto do chat */
 .message-response strong,
-.message-response b,
-strong,
-b {
+.message-response b {
   font-weight: 900 !important;
   font-variation-settings: "wght" 900;
+  color: oklch(0.16 0.04 155);
+}
+
+.dark .message-response strong,
+.dark .message-response b {
+  color: oklch(0.98 0.01 155);
 }
