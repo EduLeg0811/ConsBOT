@@ -251,5 +251,5 @@
 /* Destaque mais forte para negrito em respostas do chat */
 .message-response strong,
 .message-response b {
-  font-weight: 800;
+  font-weight: 900;
 }
