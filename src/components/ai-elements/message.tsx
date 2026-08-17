@@ -35,7 +35,7 @@ export type MessageContentProps = HTMLAttributes<HTMLDivElement>;
 export const MessageContent = ({ children, className, ...props }: MessageContentProps) => (
   <div
     className={cn(
-      "is-user:dark flex w-fit min-w-0 max-w-full flex-col gap-2 overflow-hidden text-sm",
+      "is-user:dark flex w-fit min-w-0 max-w-full flex-col gap-2 overflow-hidden text-sm font-chat",
       "group-[.is-user]:ml-auto group-[.is-user]:rounded-lg group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",
       "group-[.is-assistant]:text-foreground",
       className,
@@ -279,7 +279,7 @@ export const MessageResponse = memo(
   ({ className, responseFormat = "chatgpt", ...props }: MessageResponseProps) => (
     <Streamdown
       className={cn(
-        "message-response size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>p]:mb-2",
+        "message-response font-chat size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>p]:mb-2",
         "[&_strong]:font-black [&_b]:font-black",
         "[&>h1]:mt-6 [&>h1]:mb-3 [&>h1]:text-lg [&>h1]:font-semibold [&>h1]:text-sky-800 dark:[&>h1]:text-sky-300 [&>h1:first-child]:mt-0",
         "[&>h2]:mt-5 [&>h2]:mb-2.5 [&>h2]:text-base [&>h2]:font-semibold [&>h2]:text-sky-800 dark:[&>h2]:text-sky-300 [&>h2:first-child]:mt-0",

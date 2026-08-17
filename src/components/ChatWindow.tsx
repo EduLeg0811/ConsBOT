@@ -1,5 +1,5 @@
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, convertToModelMessages } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ArrowUp, Copy, Database, RefreshCw, Share2 } from "lucide-react";
@@ -20,6 +20,7 @@ import {
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
 import { MODELS, VECTOR_STORES, type ChatSettings } from "@/lib/chat-settings";
+import { API_BASE } from "@/lib/main-server";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type {
   AuditCompletion,
@@ -27,6 +28,13 @@ import type {
   ConsBotUIMessage,
   OpenAIAuditEvent,
 } from "@/lib/audit-log";
+
+/** `"none"` in ChatSettings means "sem RAG"; Main-Server takes an empty list
+ * for that, and only forces the file_search tool when a store is actually
+ * selected — forcing it with nothing to search would be a 400. */
+function vectorStoresFor(vectorStoreId: ChatSettings["vectorStoreId"]) {
+  return vectorStoreId === "none" ? [] : [vectorStoreId];
+}
 
 const REASONING_LABELS: Record<ChatSettings["reasoningEffort"], string> = {
   none: "Imediato",
@@ -37,12 +45,40 @@ const REASONING_LABELS: Record<ChatSettings["reasoningEffort"], string> = {
   max: "Máximo",
 };
 
-type SuggestionsResponse = {
-  suggestions?: string[];
-  themes?: string[];
-  audit?: { request?: unknown; response?: unknown };
-  error?: string;
-};
+// Schema JSON-Schema estrito para o /api/llm gerar as sugestões — o
+// equivalente do zod suggestionItemSchema que a antiga função /api/suggestions
+// usava com generateObject. min/maxLength e minItems/maxItems são um reforço;
+// a validação real que decide se o lote é aceito continua sendo
+// isCompletePortugueseSuggestion + a checagem de contagem abaixo, como sempre foi.
+const SUGGESTIONS_SCHEMA = {
+  type: "object",
+  properties: {
+    suggestions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          topic: {
+            type: "string",
+            description:
+              "A temática, conceito ou especialidade central da Conscienciologia abordada (ex: 'Estado Vibracional', 'Reciclagem Existencial', 'Tenepes', 'Holossoma', 'Autopensenização', etc.).",
+          },
+          question: {
+            type: "string",
+            description:
+              "Uma pergunta inicial completa, clara e convidativa em português do Brasil, terminada em ponto de interrogação.",
+          },
+        },
+        required: ["topic", "question"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["suggestions"],
+  additionalProperties: false,
+} as const;
+
+type SuggestionsPayload = { suggestions?: Array<{ topic?: string; question?: string }> };
 
 function isCompletePortugueseSuggestion(value: unknown): value is string {
   if (typeof value !== "string") return false;
@@ -71,9 +107,9 @@ function getRagStatus(
   const metadata = userMessage.metadata;
   const vectorStoreId =
     metadata &&
-      typeof metadata === "object" &&
-      "ragVectorStoreId" in metadata &&
-      typeof metadata.ragVectorStoreId === "string"
+    typeof metadata === "object" &&
+    "ragVectorStoreId" in metadata &&
+    typeof metadata.ragVectorStoreId === "string"
       ? metadata.ragVectorStoreId
       : fallbackVectorStoreId;
   const vectorStoreLabel = VECTOR_STORES.find((store) => store.id === vectorStoreId)?.label;
@@ -173,13 +209,14 @@ export function ChatWindow({
 
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
-  const sessionId = threadId;
   const activeModel = MODELS.find((model) => model.id === settings.model);
   const activeVectorStore = VECTOR_STORES.find((store) => store.id === settings.vectorStoreId);
   const llmParameters = [
     `GPT-5.6 ${activeModel?.label.replace("ConsBOT ", "") ?? "Terra"}`,
     REASONING_LABELS[settings.reasoningEffort],
-    ({ low: "Low verbosity", medium: "Medium verbosity", high: "High verbosity" })[settings.textVerbosity],
+    { low: "Low verbosity", medium: "Medium verbosity", high: "High verbosity" }[
+      settings.textVerbosity
+    ],
     `${settings.maxOutputTokens} tokens`,
     settings.vectorStoreId === "none" ? "Sem RAG" : activeVectorStore?.label,
     settings.responseFormat === "conscienciological" ? "Confor Conscienciológico" : "Modo livre",
@@ -192,7 +229,7 @@ export function ChatWindow({
 
     const controller = new AbortController();
     void fetch(
-      `/api/vector-store-files?vectorStoreId=${encodeURIComponent(settings.vectorStoreId)}&summary=1`,
+      `${API_BASE}/api/vector-stores/${encodeURIComponent(settings.vectorStoreId)}/files?summary=true`,
       { signal: controller.signal, headers: { Accept: "application/json" } },
     )
       .then(async (response) => {
@@ -210,23 +247,28 @@ export function ChatWindow({
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
-        api: "/api/chat",
-        prepareSendMessagesRequest: ({ messages, body }) => ({
-          body: {
-            ...body,
-            messages,
-            sessionId,
-            model: settingsRef.current.model,
-            vectorStoreId: settingsRef.current.vectorStoreId,
-            systemPrompt: settingsRef.current.systemPrompt,
-            responseFormat: settingsRef.current.responseFormat,
-            reasoningEffort: settingsRef.current.reasoningEffort,
-            textVerbosity: settingsRef.current.textVerbosity,
-            maxOutputTokens: settingsRef.current.maxOutputTokens,
-          },
-        }),
+        api: `${API_BASE}/api/llm`,
+        prepareSendMessagesRequest: async ({ messages }) => {
+          const vectorStores = vectorStoresFor(settingsRef.current.vectorStoreId);
+          return {
+            body: {
+              // Main-Server takes plain role/content messages, not UIMessage[]
+              // — the same conversion the removed /api/chat function used to
+              // do server-side, now run here before the request leaves the browser.
+              messages: await convertToModelMessages(messages),
+              model: settingsRef.current.model,
+              systemPrompt: settingsRef.current.systemPrompt,
+              reasoningEffort: settingsRef.current.reasoningEffort,
+              verbosity: settingsRef.current.textVerbosity,
+              maxOutputTokens: settingsRef.current.maxOutputTokens,
+              vectorStores,
+              ...(vectorStores.length > 0 ? { toolChoice: { type: "file_search" } } : {}),
+              stream: true,
+            },
+          };
+        },
       }),
-    [sessionId],
+    [],
   );
 
   const { messages, sendMessage, status, stop, setMessages, regenerate } =
@@ -235,7 +277,7 @@ export function ChatWindow({
       messages: initialMessages,
       transport,
       onData: (part) => {
-        if (part.type === "data-openaiAudit") openaiAuditRef.current = part.data;
+        if (part.type === "data-llmMeta") openaiAuditRef.current = part.data;
       },
       onError: (error) => {
         if (pendingAuditId.current) {
@@ -285,9 +327,14 @@ export function ChatWindow({
     if (lastAssistant) {
       onAuditComplete(pendingAuditId.current, {
         openaiRequest: openaiAuditRef.current?.request,
-        response: openaiAuditRef.current?.response ?? {
-          aviso: "O stream terminou sem metadados de auditoria da OpenAI.",
-        },
+        response: openaiAuditRef.current
+          ? {
+              responseId: openaiAuditRef.current.responseId,
+              model: openaiAuditRef.current.model,
+              finishReason: openaiAuditRef.current.finishReason,
+              usage: openaiAuditRef.current.usage,
+            }
+          : { aviso: "O stream terminou sem metadados de auditoria da OpenAI." },
         uiResponse: lastAssistant,
       });
     } else
@@ -306,18 +353,17 @@ export function ChatWindow({
       if (!value || isBusy) return;
       openaiAuditRef.current = null;
       pendingAuditId.current = onAuditStart({
-        endpoint: "/api/chat",
+        endpoint: `${API_BASE}/api/llm`,
         sentAt: new Date().toISOString(),
         body: {
           messages: [...messages, { role: "user", parts: [{ type: "text", text: value }] }],
-          sessionId,
           model: settingsRef.current.model,
-          vectorStoreId: settingsRef.current.vectorStoreId,
+          vectorStores: vectorStoresFor(settingsRef.current.vectorStoreId),
           systemPrompt: settingsRef.current.systemPrompt,
-          responseFormat: settingsRef.current.responseFormat,
           reasoningEffort: settingsRef.current.reasoningEffort,
-          textVerbosity: settingsRef.current.textVerbosity,
+          verbosity: settingsRef.current.textVerbosity,
           maxOutputTokens: settingsRef.current.maxOutputTokens,
+          stream: true,
         },
       });
       setInput("");
@@ -326,7 +372,7 @@ export function ChatWindow({
         metadata: { ragVectorStoreId: settingsRef.current.vectorStoreId },
       });
     },
-    [isBusy, messages, onAuditStart, sendMessage, sessionId],
+    [isBusy, messages, onAuditStart, sendMessage],
   );
 
   useEffect(() => {
@@ -358,48 +404,80 @@ export function ChatWindow({
     const isMobileView = typeof window !== "undefined" ? window.innerWidth < 768 : isMobile;
     const expectedCount = isMobileView ? 2 : 4;
     setIsRefreshingSuggestions(true);
+
+    const previousThemesContext =
+      previousThemesRef.current.length > 0
+        ? `\nTemáticas/conceitos da Conscienciologia já abordados anteriormente nesta sessão (NÃO repita nem se aproxime dessas temáticas):\n${previousThemesRef.current
+            .map((theme) => `- ${theme}`)
+            .join(
+              "\n",
+            )}\n\nEscolha temáticas completamente inéditas e distintas dentro do amplo universo da Conscienciologia.\n`
+        : "";
+    const prompt =
+      `Gere exatamente ${expectedCount} perguntas de sugestão sobre o corpus da Conscienciologia seguindo estritamente estas diretrizes:\n\n` +
+      `- Para cada item retorne a temática ('topic') e a pergunta ('question').\n` +
+      `- Cada pergunta deve abordar uma temática ou conceito totalmente diferente das outras perguntas deste lote.\n` +
+      `- Escolha livremente novas temáticas e termos técnicos da Conscienciologia, variando amplamente os tópicos a cada geração.\n` +
+      `- Não repita temáticas abordadas em rodadas anteriores.\n` +
+      `- Gere perguntas com no máximo 10 palavras cada uma.\n` +
+      `- Escreva em português do Brasil, de forma clara, natural e terminando com ponto de interrogação.\n` +
+      `- Não faça perguntas muito fechadas ou que possam ser respondidas com sim ou não.\n` +
+      `- Prefira usar termos e jargões conscienciológicos.\n` +
+      previousThemesContext;
+
+    const requestBody = {
+      messages: [{ role: "user", content: prompt }],
+      model: "gpt-5.6-luna",
+      reasoningEffort: "none",
+      verbosity: "low",
+      maxOutputTokens: 512,
+      responseSchema: SUGGESTIONS_SCHEMA,
+      responseSchemaName: "perguntas_iniciais",
+      responseSchemaDescription: `Um objeto com exatamente ${expectedCount} sugestões contendo temática ('topic') e pergunta ('question') sobre Conscienciologia, com temas variados e perguntas curtas (máx 10 palavras).`,
+    };
     const auditId = onAuditStart({
-      endpoint: "/api/suggestions",
+      endpoint: `${API_BASE}/api/llm`,
       sentAt: new Date().toISOString(),
-      body: {
-        model: "gpt-5.6-luna",
-        reasoningEffort: "none",
-        maxOutputTokens: 512,
-        count: expectedCount,
-        previousThemes: previousThemesRef.current,
-      },
+      body: requestBody,
     });
 
     try {
-      const response = await fetch("/api/suggestions", {
+      const response = await fetch(`${API_BASE}/api/llm`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          sessionId,
-          count: expectedCount,
-          previousThemes: previousThemesRef.current,
-        }),
+        body: JSON.stringify(requestBody),
       });
-      const result = (await response.json()) as SuggestionsResponse;
-      if (!response.ok) throw new Error(result.error || "Não foi possível gerar novas perguntas.");
-      const completeSuggestions = Array.isArray(result.suggestions)
-        ? result.suggestions.filter(isCompletePortugueseSuggestion)
-        : [];
+      const result = (await response.json()) as {
+        content?: string;
+        detail?: string;
+        request?: unknown;
+        responseId?: string | null;
+        model?: string;
+        usage?: unknown;
+      };
+      if (!response.ok) {
+        throw new Error(result.detail || "Não foi possível gerar novas perguntas.");
+      }
+      const parsed = result.content ? (JSON.parse(result.content) as SuggestionsPayload) : {};
+      const suggestionItems = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+      const completeSuggestions = suggestionItems
+        .map((item) => item.question)
+        .filter(isCompletePortugueseSuggestion);
       if (completeSuggestions.length !== expectedCount) {
         throw new Error(
           `A LLM não retornou ${expectedCount === 2 ? "duas" : "quatro"} perguntas completas em português brasileiro.`,
         );
       }
-      if (Array.isArray(result.themes) && result.themes.length > 0) {
-        const validThemes = result.themes.filter(
-          (t): t is string => typeof t === "string" && Boolean(t.trim()),
-        );
+      const validThemes = suggestionItems
+        .map((item) => item.topic)
+        .filter((topic): topic is string => typeof topic === "string" && Boolean(topic.trim()));
+      if (validThemes.length > 0) {
         previousThemesRef.current = [...previousThemesRef.current, ...validThemes].slice(-30);
       }
       setSuggestions(completeSuggestions);
       onAuditComplete(auditId, {
-        openaiRequest: result.audit?.request,
-        response: result.audit?.response ?? result,
+        openaiRequest: result.request,
+        response: { responseId: result.responseId, model: result.model, usage: result.usage },
         uiResponse: completeSuggestions,
       });
     } catch (error) {
@@ -410,7 +488,7 @@ export function ChatWindow({
     } finally {
       setIsRefreshingSuggestions(false);
     }
-  }, [isBusy, isMobile, isRefreshingSuggestions, onAuditComplete, onAuditStart, sessionId]);
+  }, [isBusy, isMobile, isRefreshingSuggestions, onAuditComplete, onAuditStart]);
 
   const initialSuggestionsRequestedRef = useRef(false);
   useEffect(() => {
@@ -432,19 +510,18 @@ export function ChatWindow({
     if (isBusy) return;
     openaiAuditRef.current = null;
     pendingAuditId.current = onAuditStart({
-      endpoint: "/api/chat",
+      endpoint: `${API_BASE}/api/llm`,
       sentAt: new Date().toISOString(),
       action: "regenerate",
       body: {
         messages,
-        sessionId,
         model: settingsRef.current.model,
-        vectorStoreId: settingsRef.current.vectorStoreId,
+        vectorStores: vectorStoresFor(settingsRef.current.vectorStoreId),
         systemPrompt: settingsRef.current.systemPrompt,
-        responseFormat: settingsRef.current.responseFormat,
         reasoningEffort: settingsRef.current.reasoningEffort,
-        textVerbosity: settingsRef.current.textVerbosity,
+        verbosity: settingsRef.current.textVerbosity,
         maxOutputTokens: settingsRef.current.maxOutputTokens,
+        stream: true,
       },
     });
     void regenerate();
@@ -514,7 +591,6 @@ export function ChatWindow({
                 </h2>
               </div>
 
-
               {!hasInitialUrlQuestion.current ? (
                 <>
                   <div className="-mb-3 flex w-full justify-end">
@@ -538,7 +614,7 @@ export function ChatWindow({
                           key={suggestion}
                           type="button"
                           onClick={() => submit(suggestion)}
-                          className="rounded-xl border border-border bg-card/80 px-3.5 py-2 text-left text-xs text-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                          className="rounded-xl border border-border bg-card/80 px-3.5 py-2 text-left text-xs font-chat text-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                         >
                           {suggestion}
                         </button>
@@ -553,7 +629,12 @@ export function ChatWindow({
           {messages.map((message, messageIndex) => {
             const ragStatus =
               message.role === "user"
-                ? getRagStatus(message, messages[messageIndex + 1], settings.vectorStoreId, sourceCounts)
+                ? getRagStatus(
+                    message,
+                    messages[messageIndex + 1],
+                    settings.vectorStoreId,
+                    sourceCounts,
+                  )
                 : null;
             return (
               <div key={message.id} className="w-full">
@@ -570,7 +651,7 @@ export function ChatWindow({
                         return (
                           <details
                             key={`${message.id}-r-${index}`}
-                            className="mb-2 rounded-xl border border-border/70 bg-secondary/60 px-3 py-2 text-xs text-muted-foreground"
+                            className="mb-2 rounded-xl border border-border/70 bg-secondary/60 px-3 py-2 text-xs font-chat text-muted-foreground"
                           >
                             <summary className="cursor-pointer font-medium">Raciocínio</summary>
                             <div className="mt-2 whitespace-pre-wrap">{part.text}</div>
@@ -580,7 +661,7 @@ export function ChatWindow({
                       if (part.type === "text") {
                         const text =
                           message.role === "assistant" &&
-                            settings.responseFormat === "conscienciological"
+                          settings.responseFormat === "conscienciological"
                             ? normalizeConscienciologicalLists(part.text)
                             : part.text;
 
@@ -666,7 +747,7 @@ export function ChatWindow({
             ref={textareaRef}
             value={input}
             onChange={(event) => setInput(event.target.value)}
-            className="field-sizing-content max-h-48 min-h-14 resize-none bg-transparent px-5 py-4 text-base"
+            className="field-sizing-content max-h-48 min-h-14 resize-none bg-transparent px-5 py-4 text-base font-chat"
             placeholder="Olá Conscienciólogo! O que você gostaria de conversar hoje?"
           />
           <div className="flex shrink-0 items-center pr-2">

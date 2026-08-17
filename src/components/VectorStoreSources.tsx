@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { VECTOR_STORES, type VectorStoreId } from "@/lib/chat-settings";
+import { API_BASE } from "@/lib/main-server";
 import { cn } from "@/lib/utils";
 
 type SourceFile = {
@@ -29,7 +30,7 @@ type SourcesResponse = {
   totalFiles: number;
   files: SourceFile[];
   truncated: boolean;
-  error?: string;
+  detail?: string;
 };
 
 // Cache em memória da sessão: alternar os painéis não deve repetir uma
@@ -76,8 +77,8 @@ export function VectorStoreSources({
   onVectorStoreChange: (vectorStoreId: VectorStoreId) => void;
   showControls: boolean;
 }) {
-  const [data, setData] = useState<SourcesResponse | null>(() =>
-    cachedSourcesByStore.get(vectorStoreId) ?? null,
+  const [data, setData] = useState<SourcesResponse | null>(
+    () => cachedSourcesByStore.get(vectorStoreId) ?? null,
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,13 +133,13 @@ export function VectorStoreSources({
     setLoading(true);
     setError(null);
 
-    void fetch(`/api/vector-store-files?vectorStoreId=${encodeURIComponent(requestedStoreId)}`, {
+    void fetch(`${API_BASE}/api/vector-stores/${encodeURIComponent(requestedStoreId)}/files`, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
     })
       .then(async (response) => {
         const body = (await response.json()) as SourcesResponse;
-        if (!response.ok) throw new Error(body.error || "Não foi possível carregar as fontes.");
+        if (!response.ok) throw new Error(body.detail || "Não foi possível carregar as fontes.");
         cachedSourcesByStore.set(requestedStoreId, body);
         setData(body);
       })

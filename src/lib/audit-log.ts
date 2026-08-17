@@ -14,15 +14,21 @@ export type AuditLog = {
   uiResponse?: unknown;
 };
 
+/** O que a rota /api/llm do Main-Server envia no chunk `data-llmMeta` ao
+ * final de um streaming: o request real despachado à OpenAI (não uma
+ * reconstrução) mais os metadados que o próprio stream não carrega inline. */
 export type OpenAIAuditEvent = {
   request: unknown;
-  response: unknown;
+  responseId: string | null;
+  model: string;
+  usage: unknown;
+  finishReason: string;
 };
 
 export type AuditCompletion = Pick<AuditLog, "openaiRequest" | "response" | "uiResponse">;
 
 export type AuditDataParts = {
-  openaiAudit: OpenAIAuditEvent;
+  llmMeta: OpenAIAuditEvent;
 };
 
 export type ConsBotUIMessage = UIMessage<unknown, AuditDataParts>;

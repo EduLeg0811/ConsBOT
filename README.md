@@ -7,8 +7,8 @@ Um aplicativo de chat com inteligência artificial moderno, responsivo e seguro,
 ## 🚀 Tecnologias
 
 - **Frontend:** React 19, Vite, React Router, Tailwind CSS v4, Radix UI, Lucide Icons, Sonner.
-- **IA & Streaming:** Vercel AI SDK (`ai`, `@ai-sdk/openai`, `@ai-sdk/react`), Streamdown (Markdown com suporte a código, matemática e mermaid).
-- **Backend / Deploy:** Rota serverless `/api/chat` compatível com **Vercel** e execução local via Vite.
+- **IA & Streaming:** Vercel AI SDK (`ai`, `@ai-sdk/react`), Streamdown (Markdown com suporte a código, matemática e mermaid).
+- **Backend:** Nenhum próprio. As chamadas de LLM, listagem de vector stores e afins vão direto para o **Main-Server**, compartilhado com os demais frontends do projeto (`src/lib/main-server.ts`). Este repositório é somente frontend.
 
 ---
 
@@ -22,11 +22,17 @@ npm install
 
 ### 2. Configurar variáveis de ambiente
 
-Crie um arquivo `.env` na raiz do projeto:
+Copie `.env.example` para `.env` e ajuste se necessário — por padrão já aponta
+para um Main-Server local em `http://127.0.0.1:8000`:
 
 ```env
-OPENAI_API_KEY=sua_chave_openai_aqui
+VITE_MAIN_SERVER_URL=http://127.0.0.1:8000
+VITE_ACCESS_LEVEL=0
 ```
+
+Rode o Main-Server separadamente (veja o repositório dele). `VITE_ACCESS_LEVEL=1`
+libera os controles de admin (modelo, effort, verbosity, vector store, max
+tokens) sem depender de `localhost`.
 
 ### 3. Iniciar o servidor de desenvolvimento
 
@@ -38,7 +44,7 @@ Abra [http://localhost:5173](http://localhost:5173) no seu navegador.
 
 ---
 
-## 📦 Build e Deploy na Vercel
+## 📦 Build e Deploy
 
 ### Build de Produção
 
@@ -46,8 +52,8 @@ Abra [http://localhost:5173](http://localhost:5173) no seu navegador.
 npm run build
 ```
 
-### Deploy na Vercel
+### Deploy
 
-1. Conecte este repositório à **Vercel**.
-2. Adicione a variável de ambiente `OPENAI_API_KEY` no painel de configurações da Vercel.
-3. O deploy configurará automaticamente o frontend SPA e a rota `/api/chat` como serverless function.
+1. Publique este repositório como site estático (Vercel, Render, etc.) — é
+   puro frontend, sem função serverless própria.
+2. Defina `VITE_MAIN_SERVER_URL` apontando para a URL pública do Main-Server.
