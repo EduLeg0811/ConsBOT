@@ -247,3 +247,9 @@
   line-height: inherit !important;
   display: inline;
 }
+
+/* Destaque mais forte para negrito em respostas do chat */
+.message-response strong,
+.message-response b {
+  font-weight: 800;
+}
