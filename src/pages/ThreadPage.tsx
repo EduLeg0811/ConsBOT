@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import {
   DEFAULT_SETTINGS,
   systemPromptForFormat,
+  withResponseFormat,
   type ChatSettings,
   type ResponseFormatId,
 } from "@/lib/chat-settings";
@@ -109,10 +110,12 @@ export function ThreadPage() {
   const effectiveSettings = active
     ? isAdmin
       ? active.settings
-      : {
+      : // Sem o painel de admin não há como customizar o prompt, então ele é
+        // sempre o canônico do formato — nunca uma cópia antiga da thread.
+        {
           ...DEFAULT_SETTINGS,
           responseFormat: active.settings.responseFormat,
-          systemPrompt: active.settings.systemPrompt,
+          systemPrompt: systemPromptForFormat(active.settings.responseFormat),
         }
     : DEFAULT_SETTINGS;
 
@@ -170,7 +173,7 @@ export function ThreadPage() {
       : {
           ...DEFAULT_SETTINGS,
           responseFormat: settings.responseFormat,
-          systemPrompt: settings.systemPrompt,
+          systemPrompt: systemPromptForFormat(settings.responseFormat),
         };
     persist(
       upsertThread(threads ?? [], {
@@ -354,11 +357,9 @@ export function ThreadPage() {
                           type="button"
                           aria-pressed={selected}
                           onClick={() =>
-                            handleSettingsChange({
-                              ...active.settings,
-                              responseFormat: format.id as ResponseFormatId,
-                              systemPrompt: systemPromptForFormat(format.id as ResponseFormatId),
-                            })
+                            handleSettingsChange(
+                              withResponseFormat(active.settings, format.id as ResponseFormatId),
+                            )
                           }
                           className={
                             selected

@@ -164,16 +164,53 @@ export type ChatSettings = {
   vectorStoreId: VectorStoreId;
   responseFormat: ResponseFormatId;
   systemPrompt: string;
+  /** Marca um `systemPrompt` escrito à mão, que não deve ser sobrescrito pelo
+   * prompt canônico do formato. Sem ela, o prompt é sempre derivado de
+   * `responseFormat` — ver `resolveSystemPrompt`. */
+  systemPromptCustom?: boolean;
   reasoningEffort: "none" | "low" | "medium" | "high" | "xhigh" | "max";
   textVerbosity: TextVerbosity;
   maxOutputTokens: number;
 };
+
+/** O prompt que a conversa deve realmente usar.
+ *
+ * Uma thread guarda suas settings no localStorage, prompt inclusive. Sem esta
+ * resolução, editar SYSTEM_CORE/OUTPUT_POLICY só valia para conversas novas:
+ * as antigas seguiam mandando ao Main-Server o texto congelado no dia em que
+ * foram criadas. Um prompt canônico é sempre recalculado a partir do formato;
+ * só o customizado pelo admin é preservado tal como foi escrito. */
+export function resolveSystemPrompt(settings: {
+  responseFormat: ResponseFormatId;
+  systemPrompt?: string;
+  systemPromptCustom?: boolean;
+}) {
+  const custom = (settings.systemPrompt ?? "").trim();
+  return settings.systemPromptCustom && custom
+    ? settings.systemPrompt!
+    : systemPromptForFormat(settings.responseFormat);
+}
+
+/** Settings com `responseFormat` novo e o prompt canônico correspondente —
+ * o que todo seletor de formato deve aplicar, descartando customização. */
+export function withResponseFormat<T extends ChatSettings>(
+  settings: T,
+  format: ResponseFormatId,
+): T {
+  return {
+    ...settings,
+    responseFormat: format,
+    systemPrompt: systemPromptForFormat(format),
+    systemPromptCustom: false,
+  };
+}
 
 export const DEFAULT_SETTINGS: ChatSettings = {
   model: "gpt-5.6-terra",
   vectorStoreId: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
   responseFormat: "conscienciological",
   systemPrompt: CONSCIENTIOLOGICAL_SYSTEM_PROMPT,
+  systemPromptCustom: false,
   reasoningEffort: "none",
   textVerbosity: "low",
   maxOutputTokens: 2048,

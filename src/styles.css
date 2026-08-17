@@ -196,30 +196,20 @@
 }
 
 /* ==========================================================================
- * Destaque ultra forte para negritos (**) no texto do chat
+ * Negrito (**) no texto do chat
+ *
+ * O Streamdown v2 nao emite <strong> para `**texto**`: emite
+ * <span data-streamdown="strong" class="font-semibold">. Sem o seletor de
+ * atributo, nenhuma regra de negrito pega e o destaque fica no peso 600 da
+ * classe do proprio Streamdown.
  * ========================================================================== */
 .message-response strong,
 .message-response b,
-.message-response * strong,
-.message-response * b,
+.message-response [data-streamdown="strong"],
 .message-content strong,
-.message-content b {
-  font-weight: 900 !important;
-  font-variation-settings: "wght" 1000, "opsz" 12;
-  -webkit-text-stroke: 0.55px currentColor;
-  text-shadow: 0 0 0.4px currentColor;
-  color: #000000 !important;
-}
-
-.dark .message-response strong,
-.dark .message-response b,
-.dark .message-response * strong,
-.dark .message-response * b,
-.dark .message-content strong,
-.dark .message-content b {
-  color: #ffffff !important;
-  -webkit-text-stroke: 0.55px currentColor;
-  text-shadow: 0 0 0.4px currentColor;
+.message-content b,
+.message-content [data-streamdown="strong"] {
+  font-weight: 700;
 }
 
 /* ==========================================================================
@@ -289,15 +279,3 @@
   display: inline;
 }
 
-/* Destaque extra forte (900) apenas para negritos dentro do texto do chat */
-.... .message-response strong,
-.message-response b {
-  font-weight: 900 !important;
-  font-variation-settings: "wght" 900;
-  color: oklch(0.16 0.04 155);
-}
-
-.dark .message-response strong,
-.dark .message-response b {
-  color: oklch(0.98 0.01 155);
-}
