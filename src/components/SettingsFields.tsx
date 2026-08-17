@@ -11,7 +11,7 @@ import {
 import {
   MODELS,
   RESPONSE_FORMATS,
-  systemPromptForFormat,
+  withResponseFormat,
   type ChatSettings,
   type ModelId,
   type ResponseFormatId,
@@ -135,13 +135,7 @@ export function SettingsFields({ value: draft, onChange: setDraft }: Props) {
                 }
                 key={format.id}
                 type="button"
-                onClick={() =>
-                  setDraft({
-                    ...draft,
-                    responseFormat: format.id as ResponseFormatId,
-                    systemPrompt: systemPromptForFormat(format.id),
-                  })
-                }
+                onClick={() => setDraft(withResponseFormat(draft, format.id as ResponseFormatId))}
               >
                 <span className="block text-xs font-medium">{format.label}</span>
                 <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
@@ -162,7 +156,11 @@ export function SettingsFields({ value: draft, onChange: setDraft }: Props) {
           className="bg-card/90 text-[11px] leading-relaxed shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)] md:text-[11px]"
           value={draft.systemPrompt}
           rows={5}
-          onChange={(event) => setDraft({ ...draft, systemPrompt: event.target.value })}
+          // `systemPromptCustom` protege o texto escrito aqui de ser
+          // recalculado a partir do formato ao recarregar a conversa.
+          onChange={(event) =>
+            setDraft({ ...draft, systemPrompt: event.target.value, systemPromptCustom: true })
+          }
           placeholder="Descreva como o ConsBOT deve se comportar..."
         />
       </div>

@@ -92,7 +92,7 @@ export const SYSTEM_CORE = `Você é um assistente de IA especializado em **Cons
 - Use apenas citações, referências e metadados identificáveis nas fontes. Diferencie citação literal de paráfrase e nunca complete dados bibliográficos ausentes de memória.
 
 ## Estilo e ambiguidade
-- Use Markdown limpo, sem introduções genéricas, repetição da pergunta ou conclusões redundantes. Use listas e exemplos somente quando acrescentarem compreensão.
+- Use sempre Markdown limpo, sem introduções genéricas, repetição da pergunta ou conclusões redundantes. Use listas e exemplos somente quando acrescentarem compreensão.
 - Nos parágrafos, destaque em *itálico* os termos técnicos, palavras-chave e expressões importantes para a compreensão da ideia. Use essa ênfase com critério: não transforme frases inteiras nem a maior parte do parágrafo em itálico.
 - Adapte profundidade e extensão à complexidade da pergunta. Diante de uma interpretação provável, prossiga; peça esclarecimento apenas se a ambiguidade impedir uma resposta confiável ou mudar materialmente a resposta.
 
@@ -134,7 +134,8 @@ Para perguntas conceituais, explicativas ou analíticas sobre Conscienciologia, 
 - [Segundo tema diretamente relacionado]
 
 ## Regras obrigatórias de estrutura
-- O título deve ter preferencialmente 2 a 5 palavras, ser específico e derivado do tema da pergunta; evite "Resposta", "Explicação" e "Análise".
+- Use sempre formatação Markdown no texto (negrito = **palavra**, itálico = *palavra*, etc)
+- O título deve ter preferencialmente 1 a 3 palavras, ser específico e derivado do tema da pergunta; evite "Resposta", "Explicação" e "Análise".
 - A frase de **Definição** deve começar obrigatoriamente com o artigo definido adequado ao gênero e número, seguido apenas do termo principal em itálico e do verbo com a concordância correta: **Definição.** A *cosmoética* é ... ou **Definição.** Os *princípios conscienciais* são .... Não use itálico em outra parte dessa frase.
 - Todo título de seção deve usar uma linha própria iniciada por #. Exceto pelo primeiro título, deixe **exatamente uma linha em branco antes e uma depois** de cada seção.
 - Em **Argumentação**, **Exemplo** e **Conclusão**, cada parágrafo deve desenvolver somente uma ideia-chave, objetiva. Se houver mais de uma ideia, separe-as em parágrafos distintos.
@@ -164,16 +165,53 @@ export type ChatSettings = {
   vectorStoreId: VectorStoreId;
   responseFormat: ResponseFormatId;
   systemPrompt: string;
+  /** Marca um `systemPrompt` escrito à mão, que não deve ser sobrescrito pelo
+   * prompt canônico do formato. Sem ela, o prompt é sempre derivado de
+   * `responseFormat` — ver `resolveSystemPrompt`. */
+  systemPromptCustom?: boolean;
   reasoningEffort: "none" | "low" | "medium" | "high" | "xhigh" | "max";
   textVerbosity: TextVerbosity;
   maxOutputTokens: number;
 };
+
+/** O prompt que a conversa deve realmente usar.
+ *
+ * Uma thread guarda suas settings no localStorage, prompt inclusive. Sem esta
+ * resolução, editar SYSTEM_CORE/OUTPUT_POLICY só valia para conversas novas:
+ * as antigas seguiam mandando ao Main-Server o texto congelado no dia em que
+ * foram criadas. Um prompt canônico é sempre recalculado a partir do formato;
+ * só o customizado pelo admin é preservado tal como foi escrito. */
+export function resolveSystemPrompt(settings: {
+  responseFormat: ResponseFormatId;
+  systemPrompt?: string;
+  systemPromptCustom?: boolean;
+}) {
+  const custom = (settings.systemPrompt ?? "").trim();
+  return settings.systemPromptCustom && custom
+    ? settings.systemPrompt!
+    : systemPromptForFormat(settings.responseFormat);
+}
+
+/** Settings com `responseFormat` novo e o prompt canônico correspondente —
+ * o que todo seletor de formato deve aplicar, descartando customização. */
+export function withResponseFormat<T extends ChatSettings>(
+  settings: T,
+  format: ResponseFormatId,
+): T {
+  return {
+    ...settings,
+    responseFormat: format,
+    systemPrompt: systemPromptForFormat(format),
+    systemPromptCustom: false,
+  };
+}
 
 export const DEFAULT_SETTINGS: ChatSettings = {
   model: "gpt-5.6-terra",
   vectorStoreId: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
   responseFormat: "conscienciological",
   systemPrompt: CONSCIENTIOLOGICAL_SYSTEM_PROMPT,
+  systemPromptCustom: false,
   reasoningEffort: "none",
   textVerbosity: "low",
   maxOutputTokens: 2048,

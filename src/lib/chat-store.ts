@@ -4,6 +4,7 @@ import {
   DEFAULT_SETTINGS,
   MODELS,
   normalizeMaxOutputTokens,
+  resolveSystemPrompt,
   RESPONSE_FORMATS,
   VECTOR_STORES,
   type ChatSettings,
@@ -48,12 +49,16 @@ function normalize(raw: unknown): ChatThread | null {
     ? settings.responseFormat
     : DEFAULT_SETTINGS.responseFormat;
   const messages = Array.isArray(t.messages) ? (t.messages as UIMessage[]) : [];
+  // Threads gravadas antes de `systemPromptCustom` existir não têm a marca e
+  // caem aqui como canônicas — que é o desejado: elas carregam uma cópia
+  // congelada do prompt da época e voltam a acompanhar o texto atual.
+  const systemPrompt = resolveSystemPrompt({ ...settings, responseFormat });
   return {
     id: t.id,
     title: typeof t.title === "string" && t.title.trim() ? t.title : "Nova conversa",
     updatedAt: typeof t.updatedAt === "number" ? t.updatedAt : Date.now(),
     messages,
-    settings: { ...settings, model, vectorStoreId, responseFormat },
+    settings: { ...settings, model, vectorStoreId, responseFormat, systemPrompt },
   };
 }
 
