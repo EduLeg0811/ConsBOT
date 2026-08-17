@@ -249,7 +249,7 @@
 }
 
 /* Destaque extra forte (900) apenas para negritos dentro do texto do chat */
-.message-response strong,
+.... .message-response strong,
 .message-response b {
   font-weight: 900 !important;
   font-variation-settings: "wght" 900;
