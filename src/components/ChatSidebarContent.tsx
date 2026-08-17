@@ -143,7 +143,7 @@ export function ChatSidebarContent({
                       className={cn(
                         "flex-1 gap-2 rounded-full border border-transparent transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                         selected &&
-                        "font-bold text-emerald-600 dark:text-emerald-300 hover:bg-sidebar-accent hover:text-emerald-700 dark:hover:text-emerald-200",
+                          "font-bold text-emerald-600 dark:text-emerald-300 hover:bg-sidebar-accent hover:text-emerald-700 dark:hover:text-emerald-200",
                       )}
                       onClick={() => setTab(id)}
                       aria-label={label === "Fontes" ? "Fontes de consulta" : label}
@@ -353,7 +353,7 @@ export function ChatSidebarContent({
                       />
                     ) : (
                       <AuditBlock
-                        label="Payload da aplicação · /api/chat"
+                        label="Payload da aplicação · POST /api/llm"
                         value={log.request}
                         onCopy={() => void copyLog(log.request)}
                       />
@@ -376,7 +376,7 @@ export function ChatSidebarContent({
                         </summary>
                         <div className="mt-3 space-y-3">
                           <AuditBlock
-                            label="Aplicação · /api/chat"
+                            label="Aplicação · POST /api/llm"
                             value={log.request}
                             onCopy={() => void copyLog(log.request)}
                           />

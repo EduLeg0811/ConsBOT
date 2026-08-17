@@ -66,29 +66,21 @@ export function ThreadPage() {
   });
   const [activeId, setActiveId] = useState<string>(() => threads[0]!.id);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [accessLevel, setAccessLevel] = useState<0 | 1>(() => {
-    if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.hostname === "[::1]")) {
-      return 1;
-    }
-    return 0;
+  // Feature-gating de UI, não uma fronteira de segurança: o admin mode antes
+  // era um pedido a uma rota serverless própria (ACCESS_LEVEL no ambiente do
+  // Vercel), que só ocultava/mostrava controles — o corpo da requisição
+  // sempre foi de livre escolha do cliente, com ou sem essa checagem. Sem
+  // backend próprio, isAdmin fica inteiramente no cliente: localhost, ou
+  // VITE_ACCESS_LEVEL=1 definido no build para uma implantação de teste.
+  const [accessLevel] = useState<0 | 1>(() => {
+    const isLocalhost =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname === "[::1]");
+    const buildFlag = String(import.meta.env.VITE_ACCESS_LEVEL || "").trim() === "1";
+    return isLocalhost || buildFlag ? 1 : 0;
   });
-
-  useEffect(() => {
-    void fetch("/api/access-level", { headers: { Accept: "application/json" } })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Não foi possível obter o nível de acesso.");
-        return (await response.json()) as { accessLevel?: unknown };
-      })
-      .then((body) => setAccessLevel(body.accessLevel === 1 ? 1 : 0))
-      .catch(() => {
-        const isLocalhost =
-          typeof window !== "undefined" &&
-          (window.location.hostname === "localhost" ||
-            window.location.hostname === "127.0.0.1" ||
-            window.location.hostname === "[::1]");
-        setAccessLevel(isLocalhost ? 1 : 0);
-      });
-  }, []);
 
   useEffect(() => {
     setAuditLogs(loadAuditLogs(activeId));
@@ -118,10 +110,10 @@ export function ThreadPage() {
     ? isAdmin
       ? active.settings
       : {
-        ...DEFAULT_SETTINGS,
-        responseFormat: active.settings.responseFormat,
-        systemPrompt: active.settings.systemPrompt,
-      }
+          ...DEFAULT_SETTINGS,
+          responseFormat: active.settings.responseFormat,
+          systemPrompt: active.settings.systemPrompt,
+        }
     : DEFAULT_SETTINGS;
 
   const goTo = (id: string) => setActiveId(id);
@@ -176,11 +168,17 @@ export function ThreadPage() {
     const nextSettings = isAdmin
       ? settings
       : {
-        ...DEFAULT_SETTINGS,
-        responseFormat: settings.responseFormat,
-        systemPrompt: settings.systemPrompt,
-      };
-    persist(upsertThread(threads ?? [], { ...active, settings: nextSettings, updatedAt: active.updatedAt }));
+          ...DEFAULT_SETTINGS,
+          responseFormat: settings.responseFormat,
+          systemPrompt: settings.systemPrompt,
+        };
+    persist(
+      upsertThread(threads ?? [], {
+        ...active,
+        settings: nextSettings,
+        updatedAt: active.updatedAt,
+      }),
+    );
   };
 
   const handleAuditStart = useCallback(
@@ -218,7 +216,8 @@ export function ThreadPage() {
       setThreads((prevThreads) => {
         const current = prevThreads.find((thread) => thread.id === activeId);
         if (!current) return prevThreads;
-        if (current.messages.length === messages.length && messages.length === 0) return prevThreads;
+        if (current.messages.length === messages.length && messages.length === 0)
+          return prevThreads;
         const nextTitle =
           current.title === "Nova conversa"
             ? (titleFromMessages(messages) ?? current.title)
@@ -316,7 +315,11 @@ export function ThreadPage() {
                 aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
                 className="inline-flex size-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
-                {isDark ? <Sun className="size-4" aria-hidden="true" /> : <Moon className="size-4" aria-hidden="true" />}
+                {isDark ? (
+                  <Sun className="size-4" aria-hidden="true" />
+                ) : (
+                  <Moon className="size-4" aria-hidden="true" />
+                )}
               </button>
             </div>
           </div>
