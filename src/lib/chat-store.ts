@@ -4,6 +4,7 @@ import {
   DEFAULT_SETTINGS,
   MODELS,
   normalizeMaxOutputTokens,
+  normalizeVectorMaxResults,
   resolveSystemPrompt,
   RESPONSE_FORMATS,
   VECTOR_STORES,
@@ -37,6 +38,7 @@ function normalize(raw: unknown): ChatThread | null {
   if (typeof t.id !== "string") return null;
   const settings = { ...DEFAULT_SETTINGS, ...(t.settings ?? {}) };
   settings.maxOutputTokens = normalizeMaxOutputTokens(settings.maxOutputTokens);
+  settings.vectorMaxResults = normalizeVectorMaxResults(settings.vectorMaxResults);
   const model = MODELS.some((candidate) => candidate.id === settings.model)
     ? settings.model
     : DEFAULT_SETTINGS.model;

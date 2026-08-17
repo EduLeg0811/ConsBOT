@@ -131,7 +131,7 @@ export function ChatSidebarContent({
               description: "Audite as chamadas e respostas da LLM.",
             },
           ]
-            .filter(({ id }) => (id !== "logs" || logsEnabled) && (id !== "settings" || isAdmin))
+            .filter(({ id }) => id !== "logs" || logsEnabled)
             .map(({ id, label, icon: Icon, description }) => {
               const selected = tab === id;
               return (
@@ -263,13 +263,13 @@ export function ChatSidebarContent({
               <RotateCcw />
             </Button>
           </div>
-          <SettingsFields value={settings} onChange={onSettingsChange} />
+          <SettingsFields value={settings} onChange={onSettingsChange} isAdmin={isAdmin} />
         </div>
       ) : tab === "sources" ? (
         <VectorStoreSources
           vectorStoreId={settings.vectorStoreId}
           onVectorStoreChange={(vectorStoreId) => onSettingsChange({ ...settings, vectorStoreId })}
-          showControls={isAdmin}
+          isAdmin={isAdmin}
         />
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">

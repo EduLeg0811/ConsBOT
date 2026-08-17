@@ -44,7 +44,9 @@ export function SettingsDialog({ settings, onSave }: Props) {
         </DialogHeader>
 
         <div className="py-2">
-          <SettingsFields value={draft} onChange={setDraft} />
+          {/* Diálogo sem consumidores hoje; enquanto existir, é o painel
+              completo — quem restringe por nível de acesso é a sidebar. */}
+          <SettingsFields value={draft} onChange={setDraft} isAdmin />
         </div>
 
         <DialogFooter className="gap-2">

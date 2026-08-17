@@ -172,6 +172,9 @@ export type ChatSettings = {
   reasoningEffort: "none" | "low" | "medium" | "high" | "xhigh" | "max";
   textVerbosity: TextVerbosity;
   maxOutputTokens: number;
+  /** Trechos que o file_search devolve por consulta — o `max_num_results` da
+   * tool. Enviado como `vectorMaxResults`; o Main-Server o limita a 1..20. */
+  vectorMaxResults: number;
 };
 
 /** O prompt que a conversa deve realmente usar.
@@ -214,10 +217,58 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   systemPromptCustom: false,
   reasoningEffort: "none",
   textVerbosity: "low",
-  maxOutputTokens: 2048,
+  maxOutputTokens: 4096,
+  vectorMaxResults: 5,
 };
 
-export const RESPONSE_LENGTH_VALUES = [256, 512, 1024, 2048, 4096] as const;
+/** Bases oferecidas com ACCESS_LEVEL=0. As demais de `VECTOR_STORES` —
+ *  incluindo "none", já que fora do admin o RAG é sempre ligado — ficam
+ *  restritas ao modo admin. */
+const PUBLIC_VECTOR_STORE_LABELS: readonly string[] = ["CONS_LIBRARY", "ALLWV", "LO", "TRANSLATE"];
+
+export const PUBLIC_VECTOR_STORES = VECTOR_STORES.filter((store) =>
+  PUBLIC_VECTOR_STORE_LABELS.includes(store.label),
+);
+
+export function vectorStoresFor(isAdmin: boolean) {
+  return isAdmin ? VECTOR_STORES : PUBLIC_VECTOR_STORES;
+}
+
+/** Mantém `vectorStoreId` dentro do que o nível de acesso permite. Uma thread
+ *  gravada em modo admin (ou por uma versão anterior) pode trazer uma base que
+ *  o usuário comum não pode escolher; ela cai para o padrão em vez de ficar
+ *  selecionada e invisível no seletor. */
+export function allowedVectorStoreId(id: VectorStoreId, isAdmin: boolean): VectorStoreId {
+  if (isAdmin) return id;
+  return PUBLIC_VECTOR_STORES.some((store) => store.id === id)
+    ? id
+    : DEFAULT_SETTINGS.vectorStoreId;
+}
+
+/** Linha de extensão anexada ao prompt conforme a verbosidade escolhida.
+ *
+ * `verbosity` sozinho é uma dica de estilo da Responses API, sem teto de
+ * tamanho; estas linhas dão o limite explícito em parágrafos. */
+export const VERBOSITY_INSTRUCTIONS: Record<TextVerbosity, string> = {
+  low: "Produza resposta concisa e objetiva, com no máximo 10 parágrafos.",
+  medium: "Produza resposta suficiente e objetiva, sem ser prolixa, com no máximo 14 parágrafos.",
+  high: "Produza resposta aprofundada, porém objetiva e sem ser prolixa, com no máximo 20 parágrafos.",
+};
+
+/** O `systemPrompt` que vai na requisição: o da conversa mais a linha da
+ *  verbosidade.
+ *
+ * Montado no envio, e não gravado na thread, por dois motivos: o admin veria a
+ * linha surgir sozinha no textarea do prompt, e trocar de verbosidade
+ * empilharia uma linha nova a cada envio em vez de substituir a anterior. */
+export function systemPromptWithVerbosity(settings: ChatSettings) {
+  const base = (settings.systemPrompt ?? "").trimEnd();
+  const instruction = VERBOSITY_INSTRUCTIONS[settings.textVerbosity];
+  if (!instruction) return base;
+  return base ? `${base}\n\n${instruction}` : instruction;
+}
+
+export const RESPONSE_LENGTH_VALUES = [4096, 8192, 16384, 32768] as const;
 
 export function normalizeMaxOutputTokens(value: unknown) {
   return typeof value === "number" &&
@@ -225,4 +276,37 @@ export function normalizeMaxOutputTokens(value: unknown) {
     RESPONSE_LENGTH_VALUES.includes(value as (typeof RESPONSE_LENGTH_VALUES)[number])
     ? value
     : DEFAULT_SETTINGS.maxOutputTokens;
+}
+
+/** Limites do `max_num_results` do file_search, iguais aos que o Main-Server
+ *  aplica em app/core/llm.py — melhor recusar aqui do que ser silenciosamente
+ *  ajustado do outro lado. */
+export const RAG_RESULTS_MIN = 1;
+export const RAG_RESULTS_MAX = 20;
+
+/** Piso de tokens por verbosidade: os 20 parágrafos pedidos na verbosidade
+ * alta precisam de orçamento para caber, ou a resposta sai truncada no meio.
+ *
+ * Hoje o piso não chega a agir, porque o menor valor de
+ * RESPONSE_LENGTH_VALUES já é 4096 — ele existe como invariante, para o caso
+ * de a escala voltar a descer. O piso só eleva, e é aplicado no envio e não
+ * gravado, para o slider seguir mostrando a escolha do admin. */
+export const VERBOSITY_MIN_OUTPUT_TOKENS: Record<TextVerbosity, number> = {
+  low: 0,
+  medium: 0,
+  high: 4096,
+};
+
+export function effectiveMaxOutputTokens(settings: ChatSettings) {
+  return Math.max(
+    normalizeMaxOutputTokens(settings.maxOutputTokens),
+    VERBOSITY_MIN_OUTPUT_TOKENS[settings.textVerbosity] ?? 0,
+  );
+}
+
+export function normalizeVectorMaxResults(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_SETTINGS.vectorMaxResults;
+  }
+  return Math.min(RAG_RESULTS_MAX, Math.max(RAG_RESULTS_MIN, Math.round(value)));
 }

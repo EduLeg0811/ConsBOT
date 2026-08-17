@@ -19,7 +19,13 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
-import { MODELS, VECTOR_STORES, type ChatSettings } from "@/lib/chat-settings";
+import {
+  effectiveMaxOutputTokens,
+  MODELS,
+  systemPromptWithVerbosity,
+  VECTOR_STORES,
+  type ChatSettings,
+} from "@/lib/chat-settings";
 import { API_BASE } from "@/lib/main-server";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type {
@@ -257,12 +263,20 @@ export function ChatWindow({
               // do server-side, now run here before the request leaves the browser.
               messages: await convertToModelMessages(messages),
               model: settingsRef.current.model,
-              systemPrompt: settingsRef.current.systemPrompt,
+              systemPrompt: systemPromptWithVerbosity(settingsRef.current),
               reasoningEffort: settingsRef.current.reasoningEffort,
               verbosity: settingsRef.current.textVerbosity,
-              maxOutputTokens: settingsRef.current.maxOutputTokens,
+              maxOutputTokens: effectiveMaxOutputTokens(settingsRef.current),
               vectorStores,
-              ...(vectorStores.length > 0 ? { toolChoice: { type: "file_search" } } : {}),
+              // `vectorMaxResults` só significa algo com file_search ativo, e
+              // vai junto do toolChoice para o corpo não afirmar mais do que
+              // a requisição realmente usa.
+              ...(vectorStores.length > 0
+                ? {
+                    toolChoice: { type: "file_search" },
+                    vectorMaxResults: settingsRef.current.vectorMaxResults,
+                  }
+                : {}),
               stream: true,
             },
           };
@@ -359,10 +373,13 @@ export function ChatWindow({
           messages: [...messages, { role: "user", parts: [{ type: "text", text: value }] }],
           model: settingsRef.current.model,
           vectorStores: vectorStoresFor(settingsRef.current.vectorStoreId),
-          systemPrompt: settingsRef.current.systemPrompt,
+          systemPrompt: systemPromptWithVerbosity(settingsRef.current),
           reasoningEffort: settingsRef.current.reasoningEffort,
           verbosity: settingsRef.current.textVerbosity,
-          maxOutputTokens: settingsRef.current.maxOutputTokens,
+          maxOutputTokens: effectiveMaxOutputTokens(settingsRef.current),
+          ...(vectorStoresFor(settingsRef.current.vectorStoreId).length > 0
+            ? { vectorMaxResults: settingsRef.current.vectorMaxResults }
+            : {}),
           stream: true,
         },
       });
@@ -517,10 +534,13 @@ export function ChatWindow({
         messages,
         model: settingsRef.current.model,
         vectorStores: vectorStoresFor(settingsRef.current.vectorStoreId),
-        systemPrompt: settingsRef.current.systemPrompt,
+        systemPrompt: systemPromptWithVerbosity(settingsRef.current),
         reasoningEffort: settingsRef.current.reasoningEffort,
         verbosity: settingsRef.current.textVerbosity,
-        maxOutputTokens: settingsRef.current.maxOutputTokens,
+        maxOutputTokens: effectiveMaxOutputTokens(settingsRef.current),
+        ...(vectorStoresFor(settingsRef.current.vectorStoreId).length > 0
+          ? { vectorMaxResults: settingsRef.current.vectorMaxResults }
+          : {}),
         stream: true,
       },
     });

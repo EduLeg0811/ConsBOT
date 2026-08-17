@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
+  allowedVectorStoreId,
   DEFAULT_SETTINGS,
   systemPromptForFormat,
   withResponseFormat,
@@ -110,12 +111,16 @@ export function ThreadPage() {
   const effectiveSettings = active
     ? isAdmin
       ? active.settings
-      : // Sem o painel de admin não há como customizar o prompt, então ele é
-        // sempre o canônico do formato — nunca uma cópia antiga da thread.
+      : // Fora do admin o painel expõe apenas formato, verbosidade e base RAG;
+        // todo o resto vem do padrão. O prompt continua sendo o canônico do
+        // formato — não há como customizá-lo aqui, então nunca uma cópia
+        // antiga da thread.
         {
           ...DEFAULT_SETTINGS,
           responseFormat: active.settings.responseFormat,
           systemPrompt: systemPromptForFormat(active.settings.responseFormat),
+          textVerbosity: active.settings.textVerbosity,
+          vectorStoreId: allowedVectorStoreId(active.settings.vectorStoreId, false),
         }
     : DEFAULT_SETTINGS;
 
@@ -174,6 +179,8 @@ export function ThreadPage() {
           ...DEFAULT_SETTINGS,
           responseFormat: settings.responseFormat,
           systemPrompt: systemPromptForFormat(settings.responseFormat),
+          textVerbosity: settings.textVerbosity,
+          vectorStoreId: allowedVectorStoreId(settings.vectorStoreId, false),
         };
     persist(
       upsertThread(threads ?? [], {
