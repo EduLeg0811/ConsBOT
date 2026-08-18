@@ -236,7 +236,16 @@ export const VERBOSITY_INSTRUCTIONS: Record<TextVerbosity, string> = {
 };
 
 export const ENGLISH_STORE_INSTRUCTION =
-  "Como a base de conhecimento selecionada é em inglês (ENGLISH), responda preferencialmente em inglês britânico (British English), a menos que o usuário solicite explicitamente outro idioma.";
+  "Because the selected knowledge base is in English (ENGLISH), reply by default in British English unless explicitly requested otherwise by the user";
+
+/** Verifica se a base de conhecimento selecionada é a base em inglês (ENGLISH). */
+export function isEnglishVectorStore(vectorStoreId?: VectorStoreId | null): boolean {
+  if (!vectorStoreId || vectorStoreId === "none") return false;
+  return (
+    vectorStoreId === "vs_69260faaec088191bbcf5e3f29b09b71" ||
+    VECTOR_STORES.find((vs) => vs.id === vectorStoreId)?.label === "ENGLISH"
+  );
+}
 
 /** O `systemPrompt` que vai na requisição: o da conversa mais as instruções
  *  dinâmicas (base em inglês, verbosidade).
@@ -247,11 +256,7 @@ export const ENGLISH_STORE_INSTRUCTION =
 export function systemPromptWithVerbosity(settings: ChatSettings) {
   let prompt = (settings.systemPrompt ?? "").trimEnd();
 
-  const isEnglishStore =
-    settings.vectorStoreId === "vs_69260faaec088191bbcf5e3f29b09b71" ||
-    VECTOR_STORES.find((vs) => vs.id === settings.vectorStoreId)?.label === "ENGLISH";
-
-  if (isEnglishStore) {
+  if (isEnglishVectorStore(settings.vectorStoreId)) {
     prompt = prompt ? `${prompt}\n\n${ENGLISH_STORE_INSTRUCTION}` : ENGLISH_STORE_INSTRUCTION;
   }
 

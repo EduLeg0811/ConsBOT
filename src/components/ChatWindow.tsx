@@ -21,6 +21,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import {
   MODELS,
+  isEnglishVectorStore,
   systemPromptWithVerbosity,
   VECTOR_STORES,
   type ChatSettings,
@@ -43,18 +44,24 @@ function vectorStoresFor(vectorStoreId: ChatSettings["vectorStoreId"]) {
 
 const REASONING_LABELS: Record<ChatSettings["reasoningEffort"], string> = {
   none: "Imediato",
-  low: "Otimizado",
-  medium: "Equilibrado",
+  low: "Baixo",
+  medium: "Médio",
   high: "Alto",
   xhigh: "Muito alto",
   max: "Máximo",
+};
+
+const VERBOSITY_LABELS: Record<ChatSettings["textVerbosity"], string> = {
+  low: "Baixo",
+  medium: "Médio",
+  high: "Alto",
 };
 
 // Schema JSON-Schema estrito para o /api/llm gerar as sugestões — o
 // equivalente do zod suggestionItemSchema que a antiga função /api/suggestions
 // usava com generateObject. min/maxLength e minItems/maxItems são um reforço;
 // a validação real que decide se o lote é aceito continua sendo
-// isCompletePortugueseSuggestion + a checagem de contagem abaixo, como sempre foi.
+// isCompleteSuggestion + a checagem de contagem abaixo, como sempre foi.
 const SUGGESTIONS_SCHEMA = {
   type: "object",
   properties: {
@@ -66,12 +73,12 @@ const SUGGESTIONS_SCHEMA = {
           topic: {
             type: "string",
             description:
-              "A temática, conceito ou especialidade central da Conscienciologia abordada (ex: 'Estado Vibracional', 'Reciclagem Existencial', 'Tenepes', 'Holossoma', 'Autopensenização', etc.).",
+              "A temática, conceito ou especialidade central da Conscienciologia abordada / Central Conscientiology concept.",
           },
           question: {
             type: "string",
             description:
-              "Uma pergunta inicial completa, clara e convidativa em português do Brasil, terminada em ponto de interrogação.",
+              "Uma pergunta inicial completa, clara e convidativa, terminada em ponto de interrogação / A complete, clear initial question ending with a question mark.",
           },
         },
         required: ["topic", "question"],
@@ -85,12 +92,12 @@ const SUGGESTIONS_SCHEMA = {
 
 type SuggestionsPayload = { suggestions?: Array<{ topic?: string; question?: string }> };
 
-function isCompletePortugueseSuggestion(value: unknown): value is string {
+function isCompleteSuggestion(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const suggestion = value.trim();
 
   return (
-    suggestion.length >= 16 &&
+    suggestion.length >= 10 &&
     suggestion.length <= 120 &&
     suggestion.endsWith("?") &&
     /^[A-Za-zÀ-ÖØ-öø-ÿ0-9 .,;:!?…'"“”‘’()\[\]{}<>/\\—–-]+$/.test(suggestion)
@@ -418,25 +425,48 @@ export function ChatWindow({
     const expectedCount = isMobileView ? 2 : 4;
     setIsRefreshingSuggestions(true);
 
+    const isEnglish = isEnglishVectorStore(settingsRef.current.vectorStoreId);
+
     const previousThemesContext =
       previousThemesRef.current.length > 0
-        ? `\nTemáticas/conceitos da Conscienciologia já abordados anteriormente nesta sessão (NÃO repita nem se aproxime dessas temáticas):\n${previousThemesRef.current
-            .map((theme) => `- ${theme}`)
-            .join(
-              "\n",
-            )}\n\nEscolha temáticas completamente inéditas e distintas dentro do amplo universo da Conscienciologia.\n`
+        ? isEnglish
+          ? `\nConscientiology themes/concepts already covered previously in this session (DO NOT repeat or approach these themes):\n${previousThemesRef.current
+              .map((theme) => `- ${theme}`)
+              .join(
+                "\n",
+              )}\n\nChoose completely new and distinct themes within the wide universe of Conscientiology.\n`
+          : `\nTemáticas/conceitos da Conscienciologia já abordados anteriormente nesta sessão (NÃO repita nem se aproxime dessas temáticas):\n${previousThemesRef.current
+              .map((theme) => `- ${theme}`)
+              .join(
+                "\n",
+              )}\n\nEscolha temáticas completamente inéditas e distintas dentro do amplo universo da Conscienciologia.\n`
         : "";
-    const prompt =
-      `Gere exatamente ${expectedCount} perguntas de sugestão sobre o corpus da Conscienciologia seguindo estritamente estas diretrizes:\n\n` +
-      `- Para cada item retorne a temática ('topic') e a pergunta ('question').\n` +
-      `- Cada pergunta deve abordar uma temática ou conceito totalmente diferente das outras perguntas deste lote.\n` +
-      `- Escolha livremente novas temáticas e termos técnicos da Conscienciologia, variando amplamente os tópicos a cada geração.\n` +
-      `- Não repita temáticas abordadas em rodadas anteriores.\n` +
-      `- Gere perguntas com no máximo 10 palavras cada uma.\n` +
-      `- Escreva em português do Brasil, de forma clara, natural e terminando com ponto de interrogação.\n` +
-      `- Não faça perguntas muito fechadas ou que possam ser respondidas com sim ou não.\n` +
-      `- Prefira usar termos e jargões conscienciológicos.\n` +
-      previousThemesContext;
+
+    const prompt = isEnglish
+      ? `Generate exactly ${expectedCount} suggested questions about the Conscientiology corpus following strictly these guidelines:\n\n` +
+        `- For each item return the topic ('topic') and the question ('question').\n` +
+        `- Each question must address a completely different topic or concept from the other questions in this batch.\n` +
+        `- Freely choose new topics and technical terms of Conscientiology, widely varying the topics in each generation.\n` +
+        `- Do not repeat topics covered in previous rounds.\n` +
+        `- Generate questions with at most 10 words each.\n` +
+        `- Write in British English, in a clear, natural manner, ending with a question mark.\n` +
+        `- Do not ask overly narrow questions or questions that can be answered with yes or no.\n` +
+        `- Prefer using Conscientiological terms and vocabulary.\n` +
+        previousThemesContext
+      : `Gere exatamente ${expectedCount} perguntas de sugestão sobre o corpus da Conscienciologia seguindo estritamente estas diretrizes:\n\n` +
+        `- Para cada item retorne a temática ('topic') e a pergunta ('question').\n` +
+        `- Cada pergunta deve abordar uma temática ou conceito totalmente diferente das outras perguntas deste lote.\n` +
+        `- Escolha livremente novas temáticas e termos técnicos da Conscienciologia, variando amplamente os tópicos a cada geração.\n` +
+        `- Não repita temáticas abordadas em rodadas anteriores.\n` +
+        `- Gere perguntas com no máximo 10 palavras cada uma.\n` +
+        `- Escreva em português do Brasil, de forma clara, natural e terminando com ponto de interrogação.\n` +
+        `- Não faça perguntas muito fechadas ou que possam ser respondidas com sim ou não.\n` +
+        `- Prefira usar termos e jargões conscienciológicos.\n` +
+        previousThemesContext;
+
+    const schemaDescription = isEnglish
+      ? `An object with exactly ${expectedCount} suggestions containing topic ('topic') and question ('question') on Conscientiology, with varied themes and short questions (max 10 words) in British English.`
+      : `Um objeto com exatamente ${expectedCount} sugestões contendo temática ('topic') e pergunta ('question') sobre Conscienciologia, com temas variados e perguntas curtas (máx 10 palavras).`;
 
     const requestBody = {
       messages: [{ role: "user", content: prompt }],
@@ -444,8 +474,8 @@ export function ChatWindow({
       reasoningEffort: "none",
       verbosity: "low",
       responseSchema: SUGGESTIONS_SCHEMA,
-      responseSchemaName: "perguntas_iniciais",
-      responseSchemaDescription: `Um objeto com exatamente ${expectedCount} sugestões contendo temática ('topic') e pergunta ('question') sobre Conscienciologia, com temas variados e perguntas curtas (máx 10 palavras).`,
+      responseSchemaName: isEnglish ? "initial_questions" : "perguntas_iniciais",
+      responseSchemaDescription: schemaDescription,
     };
     const auditId = onAuditStart({
       endpoint: `${API_BASE}/api/llm`,
@@ -468,16 +498,21 @@ export function ChatWindow({
         usage?: unknown;
       };
       if (!response.ok) {
-        throw new Error(result.detail || "Não foi possível gerar novas perguntas.");
+        throw new Error(
+          result.detail ||
+            (isEnglish ? "Unable to generate new questions." : "Não foi possível gerar novas perguntas."),
+        );
       }
       const parsed = result.content ? (JSON.parse(result.content) as SuggestionsPayload) : {};
       const suggestionItems = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
       const completeSuggestions = suggestionItems
         .map((item) => item.question)
-        .filter(isCompletePortugueseSuggestion);
+        .filter(isCompleteSuggestion);
       if (completeSuggestions.length !== expectedCount) {
         throw new Error(
-          `A LLM não retornou ${expectedCount === 2 ? "duas" : "quatro"} perguntas completas em português brasileiro.`,
+          isEnglish
+            ? `The LLM did not return ${expectedCount === 2 ? "two" : "four"} complete questions in British English.`
+            : `A LLM não retornou ${expectedCount === 2 ? "duas" : "quatro"} perguntas completas em português brasileiro.`,
         );
       }
       const validThemes = suggestionItems
@@ -494,7 +529,11 @@ export function ChatWindow({
       });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Não foi possível gerar novas perguntas.";
+        error instanceof Error
+          ? error.message
+          : isEnglish
+            ? "Unable to generate new questions."
+            : "Não foi possível gerar novas perguntas.";
       onAuditComplete(auditId, { response: { error: message } }, "error");
       toast.error(message);
     } finally {
@@ -607,14 +646,22 @@ export function ChatWindow({
 
               {!hasInitialUrlQuestion.current ? (
                 <>
-                  <div className="-mb-3 flex w-full justify-end">
+                    <div className="-mb-3 flex w-full justify-end">
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon-sm"
                       className="rounded-full text-muted-foreground/70 hover:bg-primary/10 hover:text-primary"
-                      aria-label="Gerar novas perguntas iniciais"
-                      title="Gerar novas perguntas"
+                      aria-label={
+                        isEnglishVectorStore(settings.vectorStoreId)
+                          ? "Generate new initial questions"
+                          : "Gerar novas perguntas iniciais"
+                      }
+                      title={
+                        isEnglishVectorStore(settings.vectorStoreId)
+                          ? "Generate new questions"
+                          : "Gerar novas perguntas"
+                      }
                       onClick={() => void refreshSuggestions()}
                       disabled={isRefreshingSuggestions || isBusy}
                     >
@@ -762,7 +809,11 @@ export function ChatWindow({
             value={input}
             onChange={(event) => setInput(event.target.value)}
             className="field-sizing-content max-h-48 min-h-14 resize-none bg-transparent px-5 py-4 text-base font-chat"
-            placeholder="Olá Conscienciólogo! O que você gostaria de conversar hoje?"
+            placeholder={
+              isEnglishVectorStore(settings.vectorStoreId)
+                ? "Hello Conscientiologist! What would you like to discuss today?"
+                : "Olá Conscienciólogo! O que você gostaria de conversar hoje?"
+            }
           />
           <div className="flex shrink-0 items-center pr-2">
             <PromptInputSubmit
