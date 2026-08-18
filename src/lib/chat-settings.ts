@@ -88,7 +88,7 @@ export const SYSTEM_CORE = `Você é um assistente de IA especializado em **Cons
 
 ## Conhecimento, linguagem e fontes
 - Em temas específicos de Conscienciologia, as fontes recuperadas são a base documental prioritária. Use conhecimento geral apenas para linguagem, organização, conceitos amplamente estabelecidos e contextualização que não as contradiga.
-- Responda no idioma do usuário; em português, prefira português brasileiro. Preserve grafias técnicas e explique termos sem substituí-los por equivalentes que alterem o sentido.
+- Responda no idioma do usuário. Preserve grafias técnicas e explique termos sem substituí-los por equivalentes que alterem o sentido.
 - Use apenas citações, referências e metadados identificáveis nas fontes. Diferencie citação literal de paráfrase e nunca complete dados bibliográficos ausentes de memória.
 
 ## Estilo e ambiguidade
@@ -235,17 +235,32 @@ export const VERBOSITY_INSTRUCTIONS: Record<TextVerbosity, string> = {
   high: "Desenvolva a resposta com maior profundidade, incluindo distinções, justificativas e detalhes relevantes, sem repetição ou conteúdo de preenchimento.",
 };
 
-/** O `systemPrompt` que vai na requisição: o da conversa mais a linha da
- *  verbosidade.
+export const ENGLISH_STORE_INSTRUCTION =
+  "Como a base de conhecimento selecionada é em inglês (ENGLISH), responda preferencialmente em inglês britânico (British English), a menos que o usuário solicite explicitamente outro idioma.";
+
+/** O `systemPrompt` que vai na requisição: o da conversa mais as instruções
+ *  dinâmicas (base em inglês, verbosidade).
  *
  * Montado no envio, e não gravado na thread, por dois motivos: o admin veria a
- * linha surgir sozinha no textarea do prompt, e trocar de verbosidade
+ * linha surgir sozinha no textarea do prompt, e trocar de parâmetros
  * empilharia uma linha nova a cada envio em vez de substituir a anterior. */
 export function systemPromptWithVerbosity(settings: ChatSettings) {
-  const base = (settings.systemPrompt ?? "").trimEnd();
+  let prompt = (settings.systemPrompt ?? "").trimEnd();
+
+  const isEnglishStore =
+    settings.vectorStoreId === "vs_69260faaec088191bbcf5e3f29b09b71" ||
+    VECTOR_STORES.find((vs) => vs.id === settings.vectorStoreId)?.label === "ENGLISH";
+
+  if (isEnglishStore) {
+    prompt = prompt ? `${prompt}\n\n${ENGLISH_STORE_INSTRUCTION}` : ENGLISH_STORE_INSTRUCTION;
+  }
+
   const instruction = VERBOSITY_INSTRUCTIONS[settings.textVerbosity];
-  if (!instruction) return base;
-  return base ? `${base}\n\n${instruction}` : instruction;
+  if (instruction) {
+    prompt = prompt ? `${prompt}\n\n${instruction}` : instruction;
+  }
+
+  return prompt;
 }
 
 /** Limites do `max_num_results` do file_search, iguais aos que o Main-Server
