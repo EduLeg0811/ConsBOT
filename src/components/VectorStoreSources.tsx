@@ -78,6 +78,7 @@ export function VectorStoreSources({
   /** O seletor aparece nos dois níveis; o que muda é quais bases ele lista. */
   isAdmin: boolean;
 }) {
+  const [selectedStoreId, setSelectedStoreId] = useState<VectorStoreId>(vectorStoreId);
   const [data, setData] = useState<SourcesResponse | null>(
     () => cachedSourcesByStore.get(vectorStoreId) ?? null,
   );
@@ -94,25 +95,31 @@ export function VectorStoreSources({
     }),
   );
 
-  const refresh = useCallback(() => {
+  useEffect(() => {
+    setSelectedStoreId(vectorStoreId);
     setHasPendingSelection(false);
-    setRequest((current) => ({
-      vectorStoreId,
-      refreshKey: current.refreshKey + 1,
-    }));
+    setData(cachedSourcesByStore.get(vectorStoreId) ?? null);
+    setError(null);
   }, [vectorStoreId]);
 
-  const handleVectorStoreChange = useCallback(
+  const refresh = useCallback(() => {
+    setHasPendingSelection(false);
+    onVectorStoreChange(selectedStoreId);
+    setRequest((current) => ({
+      vectorStoreId: selectedStoreId,
+      refreshKey: current.refreshKey + 1,
+    }));
+  }, [onVectorStoreChange, selectedStoreId]);
+
+  const handleSelectChange = useCallback(
     (nextVectorStoreId: VectorStoreId) => {
-      const cached = cachedSourcesByStore.get(nextVectorStoreId) ?? null;
-      // Uma base já carregada pode ser exibida imediatamente; apenas uma
-      // base sem cache precisa aguardar o refresh solicitado pelo usuário.
-      setData(cached);
+      setSelectedStoreId(nextVectorStoreId);
       setError(null);
-      setHasPendingSelection(nextVectorStoreId !== "none" && cached === null);
-      onVectorStoreChange(nextVectorStoreId);
+      setHasPendingSelection(nextVectorStoreId !== vectorStoreId);
+      const cached = cachedSourcesByStore.get(nextVectorStoreId) ?? null;
+      setData(cached);
     },
-    [onVectorStoreChange],
+    [vectorStoreId],
   );
 
   useEffect(() => {
@@ -158,10 +165,11 @@ export function VectorStoreSources({
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
       <SourcesHeader
-        vectorStoreId={vectorStoreId}
+        selectedStoreId={selectedStoreId}
+        committedStoreId={vectorStoreId}
         loadedStoreLabel={data?.vectorStore.label ?? null}
         pending={hasPendingSelection}
-        onVectorStoreChange={handleVectorStoreChange}
+        onSelectChange={handleSelectChange}
         onRefresh={refresh}
         disabled={loading}
         isAdmin={isAdmin}
@@ -261,23 +269,25 @@ export function VectorStoreSources({
 }
 
 function SourcesHeader({
-  vectorStoreId,
+  selectedStoreId,
+  committedStoreId,
   loadedStoreLabel,
   pending,
-  onVectorStoreChange,
+  onSelectChange,
   onRefresh,
   disabled,
   isAdmin,
 }: {
-  vectorStoreId: VectorStoreId;
+  selectedStoreId: VectorStoreId;
+  committedStoreId: VectorStoreId;
   loadedStoreLabel: string | null;
   pending: boolean;
-  onVectorStoreChange: (vectorStoreId: VectorStoreId) => void;
+  onSelectChange: (vectorStoreId: VectorStoreId) => void;
   onRefresh: () => void;
   disabled: boolean;
   isAdmin: boolean;
 }) {
-  const selectedStore = VECTOR_STORES.find((store) => store.id === vectorStoreId);
+  const selectedStore = VECTOR_STORES.find((store) => store.id === selectedStoreId);
 
   return (
     <div className="mb-7 space-y-3 px-1 pt-1">
@@ -293,7 +303,7 @@ function SourcesHeader({
       <div className="mt-5 space-y-2">
         {/* <Label>Busca com RAG</Label> */}
         {/* Os rótulos são siglas internas (ALLWV, LO...) que não dizem nada a
-            quem chega agora. Vem de `vectorStoreId`, a seleção corrente, e não
+            quem chega agora. Vem de `selectedStoreId`, a seleção corrente, e não
             de `loadedStoreLabel`: a descrição deve acompanhar a escolha no
             ato, sem esperar o refresh que carrega a lista de arquivos. */}
         {selectedStore ? (
@@ -303,8 +313,8 @@ function SourcesHeader({
         ) : null}
         <div className="flex items-center gap-2">
           <Select
-            value={vectorStoreId}
-            onValueChange={(value) => onVectorStoreChange(value as VectorStoreId)}
+            value={selectedStoreId}
+            onValueChange={(value) => onSelectChange(value as VectorStoreId)}
           >
             <SelectTrigger className="min-w-0 flex-1 bg-card shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
               <SelectValue />
@@ -337,7 +347,7 @@ function SourcesHeader({
         >
           {pending
             ? "Seleção alterada: atualize"
-            : vectorStoreId === "none"
+            : committedStoreId === "none"
               ? "Nenhuma base será usada nas chamadas."
               : `Vector Store: ${loadedStoreLabel ?? "aguardando…"}`}
         </p>
