@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { vectorStoresFor, type VectorStoreId } from "@/lib/chat-settings";
+import { VECTOR_STORES, vectorStoresFor, type VectorStoreId } from "@/lib/chat-settings";
 import { API_BASE } from "@/lib/main-server";
 import { cn } from "@/lib/utils";
 
@@ -277,6 +277,8 @@ function SourcesHeader({
   disabled: boolean;
   isAdmin: boolean;
 }) {
+  const selectedStore = VECTOR_STORES.find((store) => store.id === vectorStoreId);
+
   return (
     <div className="mb-7 space-y-3 px-1 pt-1">
       <div className="min-w-0">
@@ -289,7 +291,16 @@ function SourcesHeader({
       </div>
 
       <div className="mt-5 space-y-2">
-        <Label>Busca com RAG</Label>
+        {/* <Label>Busca com RAG</Label> */}
+        {/* Os rótulos são siglas internas (ALLWV, LO...) que não dizem nada a
+            quem chega agora. Vem de `vectorStoreId`, a seleção corrente, e não
+            de `loadedStoreLabel`: a descrição deve acompanhar a escolha no
+            ato, sem esperar o refresh que carrega a lista de arquivos. */}
+        {selectedStore ? (
+          <p className="mb-2 text-[10px] leading-snug text-muted-foreground/80">
+            {selectedStore.description}
+          </p>
+        ) : null}
         <div className="flex items-center gap-2">
           <Select
             value={vectorStoreId}

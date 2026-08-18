@@ -20,7 +20,6 @@ import {
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
 import {
-  effectiveMaxOutputTokens,
   MODELS,
   systemPromptWithVerbosity,
   VECTOR_STORES,
@@ -45,7 +44,7 @@ function vectorStoresFor(vectorStoreId: ChatSettings["vectorStoreId"]) {
 const REASONING_LABELS: Record<ChatSettings["reasoningEffort"], string> = {
   none: "Imediato",
   low: "Otimizado",
-  medium: "Médio",
+  medium: "Equilibrado",
   high: "Alto",
   xhigh: "Muito alto",
   max: "Máximo",
@@ -223,7 +222,6 @@ export function ChatWindow({
     { low: "Low verbosity", medium: "Medium verbosity", high: "High verbosity" }[
       settings.textVerbosity
     ],
-    `${settings.maxOutputTokens} tokens`,
     settings.vectorStoreId === "none" ? "Sem RAG" : activeVectorStore?.label,
     settings.responseFormat === "conscienciological" ? "Confor Conscienciológico" : "Modo livre",
   ].filter((parameter): parameter is string => Boolean(parameter));
@@ -266,7 +264,6 @@ export function ChatWindow({
               systemPrompt: systemPromptWithVerbosity(settingsRef.current),
               reasoningEffort: settingsRef.current.reasoningEffort,
               verbosity: settingsRef.current.textVerbosity,
-              maxOutputTokens: effectiveMaxOutputTokens(settingsRef.current),
               vectorStores,
               // `vectorMaxResults` só significa algo com file_search ativo, e
               // vai junto do toolChoice para o corpo não afirmar mais do que
@@ -376,7 +373,6 @@ export function ChatWindow({
           systemPrompt: systemPromptWithVerbosity(settingsRef.current),
           reasoningEffort: settingsRef.current.reasoningEffort,
           verbosity: settingsRef.current.textVerbosity,
-          maxOutputTokens: effectiveMaxOutputTokens(settingsRef.current),
           ...(vectorStoresFor(settingsRef.current.vectorStoreId).length > 0
             ? { vectorMaxResults: settingsRef.current.vectorMaxResults }
             : {}),
@@ -447,7 +443,6 @@ export function ChatWindow({
       model: "gpt-5.6-luna",
       reasoningEffort: "none",
       verbosity: "low",
-      maxOutputTokens: 512,
       responseSchema: SUGGESTIONS_SCHEMA,
       responseSchemaName: "perguntas_iniciais",
       responseSchemaDescription: `Um objeto com exatamente ${expectedCount} sugestões contendo temática ('topic') e pergunta ('question') sobre Conscienciologia, com temas variados e perguntas curtas (máx 10 palavras).`,
@@ -537,7 +532,6 @@ export function ChatWindow({
         systemPrompt: systemPromptWithVerbosity(settingsRef.current),
         reasoningEffort: settingsRef.current.reasoningEffort,
         verbosity: settingsRef.current.textVerbosity,
-        maxOutputTokens: effectiveMaxOutputTokens(settingsRef.current),
         ...(vectorStoresFor(settingsRef.current.vectorStoreId).length > 0
           ? { vectorMaxResults: settingsRef.current.vectorMaxResults }
           : {}),

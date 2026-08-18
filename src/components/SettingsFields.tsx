@@ -9,26 +9,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  effectiveMaxOutputTokens,
   MODELS,
-  normalizeMaxOutputTokens,
   normalizeVectorMaxResults,
   RAG_RESULTS_MAX,
   RAG_RESULTS_MIN,
+  RAG_RESULTS_STEP,
   RESPONSE_FORMATS,
-  RESPONSE_LENGTH_VALUES,
   withResponseFormat,
   type ChatSettings,
   type ModelId,
   type ResponseFormatId,
 } from "@/lib/chat-settings";
-
-/** O valor da lista que o slider deve apontar. Uma thread antiga pode trazer
- *  um `maxOutputTokens` fora da escala; cai no padrão em vez de somar um
- *  degrau extra ao slider. */
-function lengthValue(draft: ChatSettings) {
-  return normalizeMaxOutputTokens(draft.maxOutputTokens) as (typeof RESPONSE_LENGTH_VALUES)[number];
-}
 
 type Props = {
   value: ChatSettings;
@@ -102,44 +93,6 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <Label>Tamanho máximo da resposta</Label>
-              <span className="text-xs font-medium text-muted-foreground">
-                {draft.maxOutputTokens} tokens
-              </span>
-            </div>
-            {/* O slider anda por índice, não por token: com `step` livre ele
-                produzia valores fora de RESPONSE_LENGTH_VALUES, que
-                normalizeMaxOutputTokens depois descartava — a escolha valia na
-                sessão e sumia ao recarregar a conversa. */}
-            <Slider
-              value={[Math.max(0, RESPONSE_LENGTH_VALUES.indexOf(lengthValue(draft)))]}
-              min={0}
-              max={RESPONSE_LENGTH_VALUES.length - 1}
-              step={1}
-              onValueChange={([index]) =>
-                setDraft({
-                  ...draft,
-                  maxOutputTokens: RESPONSE_LENGTH_VALUES[index ?? 0] ?? draft.maxOutputTokens,
-                })
-              }
-            />
-            <div className="flex justify-between px-0.5 text-[10px] tabular-nums text-muted-foreground">
-              {RESPONSE_LENGTH_VALUES.map((value) => (
-                <span key={value}>{value}</span>
-              ))}
-            </div>
-            {/* Sem isto o slider diria 1024 enquanto a requisição manda 4096:
-                um piso silencioso sobre um valor que o admin escolheu à mão. */}
-            {effectiveMaxOutputTokens(draft) > lengthValue(draft) ? (
-              <p className="text-[11px] leading-relaxed text-amber-700">
-                A verbosidade alta eleva o envio para {effectiveMaxOutputTokens(draft)} tokens — 20
-                parágrafos não cabem em {lengthValue(draft)}.
-              </p>
-            ) : null}
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
               <Label>Max RAG Results</Label>
               <span className="text-xs font-medium text-muted-foreground">
                 {draft.vectorMaxResults} trechos
@@ -149,7 +102,7 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
               value={[draft.vectorMaxResults]}
               min={RAG_RESULTS_MIN}
               max={RAG_RESULTS_MAX}
-              step={1}
+              step={RAG_RESULTS_STEP}
               onValueChange={([value]) =>
                 setDraft({
                   ...draft,
@@ -157,6 +110,11 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
                 })
               }
             />
+            <div className="flex justify-between px-0.5 text-[10px] tabular-nums text-muted-foreground">
+              {[5, 10, 15, 20].map((value) => (
+                <span key={value}>{value}</span>
+              ))}
+            </div>
             <p className="text-[11px] leading-relaxed text-muted-foreground">
               Trechos que a busca RAG devolve por consulta (`max_num_results`).
             </p>
@@ -226,11 +184,10 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
             className="bg-card/90 text-[11px] leading-relaxed shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)] md:text-[11px]"
             value={draft.systemPrompt}
             rows={5}
-            // `systemPromptCustom` protege o texto escrito aqui de ser
-            // recalculado a partir do formato ao recarregar a conversa.
-            onChange={(event) =>
-              setDraft({ ...draft, systemPrompt: event.target.value, systemPromptCustom: true })
-            }
+            // Trocar o formato ainda sobrescreve este texto pelo canônico
+            // (withResponseFormat); dentro da sessão é a única coisa que o
+            // recalcula, e nada sobrevive à recarga da página.
+            onChange={(event) => setDraft({ ...draft, systemPrompt: event.target.value })}
             placeholder="Descreva como o ConsBOT deve se comportar..."
           />
         </div>

@@ -1,15 +1,6 @@
 import type { UIMessage } from "ai";
 
-import {
-  DEFAULT_SETTINGS,
-  MODELS,
-  normalizeMaxOutputTokens,
-  normalizeVectorMaxResults,
-  resolveSystemPrompt,
-  RESPONSE_FORMATS,
-  VECTOR_STORES,
-  type ChatSettings,
-} from "@/lib/chat-settings";
+import { DEFAULT_SETTINGS, type ChatSettings } from "@/lib/chat-settings";
 
 export type ChatThread = {
   id: string;
@@ -36,31 +27,17 @@ function normalize(raw: unknown): ChatThread | null {
   if (!raw || typeof raw !== "object") return null;
   const t = raw as Partial<ChatThread>;
   if (typeof t.id !== "string") return null;
-  const settings = { ...DEFAULT_SETTINGS, ...(t.settings ?? {}) };
-  settings.maxOutputTokens = normalizeMaxOutputTokens(settings.maxOutputTokens);
-  settings.vectorMaxResults = normalizeVectorMaxResults(settings.vectorMaxResults);
-  const model = MODELS.some((candidate) => candidate.id === settings.model)
-    ? settings.model
-    : DEFAULT_SETTINGS.model;
-  const vectorStoreId = VECTOR_STORES.some((candidate) => candidate.id === settings.vectorStoreId)
-    ? settings.vectorStoreId
-    : DEFAULT_SETTINGS.vectorStoreId;
-  const responseFormat = RESPONSE_FORMATS.some(
-    (candidate) => candidate.id === settings.responseFormat,
-  )
-    ? settings.responseFormat
-    : DEFAULT_SETTINGS.responseFormat;
   const messages = Array.isArray(t.messages) ? (t.messages as UIMessage[]) : [];
-  // Threads gravadas antes de `systemPromptCustom` existir não têm a marca e
-  // caem aqui como canônicas — que é o desejado: elas carregam uma cópia
-  // congelada do prompt da época e voltam a acompanhar o texto atual.
-  const systemPrompt = resolveSystemPrompt({ ...settings, responseFormat });
   return {
     id: t.id,
     title: typeof t.title === "string" && t.title.trim() ? t.title : "Nova conversa",
     updatedAt: typeof t.updatedAt === "number" ? t.updatedAt : Date.now(),
     messages,
-    settings: { ...settings, model, vectorStoreId, responseFormat, systemPrompt },
+    // As settings são de sessão: toda carga da página parte do padrão, e o
+    // que estiver gravado (por uma versão anterior) é ignorado de propósito.
+    // Por isso não há validação de model/vectorStoreId/responseFormat aqui —
+    // o padrão é válido por construção.
+    settings: { ...DEFAULT_SETTINGS },
   };
 }
 
@@ -82,7 +59,12 @@ export function loadThreads(): ChatThread[] {
 
 export function saveThreads(threads: ChatThread[]) {
   if (!isBrowser()) return;
-  window.localStorage.setItem(THREADS_KEY, JSON.stringify(threads));
+  // `settings` fica de fora: os ajustes do menu de configuração valem só para
+  // a sessão em curso. Gravá-los e depois ignorá-los na leitura daria no
+  // mesmo, mas deixaria no localStorage um estado que nada relê — e que
+  // pareceria autoritativo para quem fosse inspecioná-lo depois.
+  const persistable = threads.map(({ settings: _settings, ...thread }) => thread);
+  window.localStorage.setItem(THREADS_KEY, JSON.stringify(persistable));
 }
 
 export function createThread(): ChatThread {
