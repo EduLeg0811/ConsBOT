@@ -43,12 +43,12 @@ function vectorStoresFor(vectorStoreId: ChatSettings["vectorStoreId"]) {
 }
 
 const REASONING_LABELS: Record<ChatSettings["reasoningEffort"], string> = {
-  none: "Imediato",
-  low: "Baixo",
-  medium: "Médio",
-  high: "Alto",
-  xhigh: "Muito alto",
-  max: "Máximo",
+  none: "None",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Very high",
+  max: "Max",
 };
 
 const VERBOSITY_LABELS: Record<ChatSettings["textVerbosity"], string> = {
@@ -122,15 +122,24 @@ function getRagStatus(
     typeof metadata === "object" &&
     "ragVectorStoreId" in metadata &&
     typeof metadata.ragVectorStoreId === "string"
-      ? metadata.ragVectorStoreId
+      ? (metadata.ragVectorStoreId as ChatSettings["vectorStoreId"])
       : fallbackVectorStoreId;
   const vectorStoreLabel = VECTOR_STORES.find((store) => store.id === vectorStoreId)?.label;
   const storeDetail = vectorStoreLabel ? ` ${vectorStoreLabel}` : "";
   const totalFiles = sourceCounts[vectorStoreId];
+  const isEnglish = isEnglishVectorStore(vectorStoreId);
 
   return fileSearchPart.state === "output-available"
-    ? `${storeDetail}${totalFiles === undefined ? "" : ` · ${totalFiles} fonte${totalFiles === 1 ? "" : "s"}`}`
-    : `Consultando ${storeDetail}…`;
+    ? `${storeDetail}${
+        totalFiles === undefined
+          ? ""
+          : isEnglish
+            ? ` · ${totalFiles} source${totalFiles === 1 ? "" : "s"}`
+            : ` · ${totalFiles} fonte${totalFiles === 1 ? "" : "s"}`
+      }`
+    : isEnglish
+      ? `Querying ${storeDetail}…`
+      : `Consultando ${storeDetail}…`;
 }
 
 function normalizeConscienciologicalLists(text: string) {
@@ -223,14 +232,19 @@ export function ChatWindow({
   settingsRef.current = settings;
   const activeModel = MODELS.find((model) => model.id === settings.model);
   const activeVectorStore = VECTOR_STORES.find((store) => store.id === settings.vectorStoreId);
+  const isEnglish = isEnglishVectorStore(settings.vectorStoreId);
   const llmParameters = [
     `GPT-5.6 ${activeModel?.label.replace("ConsBOT ", "") ?? "Terra"}`,
     REASONING_LABELS[settings.reasoningEffort],
     { low: "Low verbosity", medium: "Medium verbosity", high: "High verbosity" }[
       settings.textVerbosity
     ],
-    settings.vectorStoreId === "none" ? "Sem RAG" : activeVectorStore?.label,
-    settings.responseFormat === "conscienciological" ? "Confor Conscienciológico" : "Modo livre",
+    settings.vectorStoreId === "none"
+      ? isEnglish
+        ? "No RAG"
+        : "Sem RAG"
+      : activeVectorStore?.label,
+    settings.responseFormat === "conscienciological" ? "Confor Cons" : "ChatGPT",
   ].filter((parameter): parameter is string => Boolean(parameter));
 
   useEffect(() => {
@@ -660,9 +674,19 @@ export function ChatWindow({
               <div className="flex flex-col items-center gap-2 text-center">
                 {/* Exemplo: 26px no mobile e 40px no desktop */}
                 <h2 className="font-display text-[26px] font-normal leading-[1.02] text-foreground sm:text-[40px] sm:leading-[1.05]">
-                  Inteligência Artificial
-                  <br />
-                  <span className="italic text-primary/80">a serviço da Consciência</span>
+                  {isEnglishVectorStore(settings.vectorStoreId) ? (
+                    <>
+                      Artificial Intelligence
+                      <br />
+                      <span className="italic text-primary/80">in Service of Consciousness</span>
+                    </>
+                  ) : (
+                    <>
+                      Inteligência Artificial
+                      <br />
+                      <span className="italic text-primary/80">a serviço da Consciência</span>
+                    </>
+                  )}
                 </h2>
               </div>
 

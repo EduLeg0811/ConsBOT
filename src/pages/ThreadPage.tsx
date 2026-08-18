@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import {
   allowedVectorStoreId,
   DEFAULT_SETTINGS,
+  isEnglishVectorStore,
   systemPromptForFormat,
   withResponseFormat,
   type ChatSettings,
@@ -347,13 +348,21 @@ export function ThreadPage() {
                 {[
                   {
                     id: "chatgpt",
-                    label: "Formato ChatGPT",
-                    description: "Resposta livre e conversacional, no estilo padrão do ChatGPT.",
+                    label: isEnglishVectorStore(effectiveSettings.vectorStoreId)
+                      ? "ChatGPT Format"
+                      : "Formato ChatGPT",
+                    description: isEnglishVectorStore(effectiveSettings.vectorStoreId)
+                      ? "Free and conversational response in ChatGPT's standard style."
+                      : "Resposta livre e conversacional, no estilo padrão do ChatGPT.",
                   },
                   {
                     id: "conscienciological",
-                    label: "Confor Conscienciológico",
-                    description: "Resposta estruturada no confor da Conscienciologia.",
+                    label: isEnglishVectorStore(effectiveSettings.vectorStoreId)
+                      ? "Conscientiological Confor"
+                      : "Confor Conscienciológico",
+                    description: isEnglishVectorStore(effectiveSettings.vectorStoreId)
+                      ? "Structured response in Conscientiology format."
+                      : "Resposta estruturada no confor da Conscienciologia.",
                   },
                 ].map((format) => {
                   const selected = active.settings.responseFormat === format.id;
