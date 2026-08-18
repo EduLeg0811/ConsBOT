@@ -26,7 +26,7 @@ export const VECTOR_STORES = [
   },
   {
     id: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
-    label: "CONS_LIBRARY",
+    label: "CONSTECA",
     description: "Fontes diversas da Conscienciologia",
   },
   {
@@ -201,7 +201,7 @@ export const DEFAULT_SETTINGS: ChatSettings = {
 /** Bases oferecidas com ACCESS_LEVEL=0. As demais de `VECTOR_STORES` —
  *  incluindo "none", já que fora do admin o RAG é sempre ligado — ficam
  *  restritas ao modo admin. */
-const PUBLIC_VECTOR_STORE_LABELS: readonly string[] = ["CONS_LIBRARY", "ALLWV", "ENGLISH", "LO"];
+const PUBLIC_VECTOR_STORE_LABELS: readonly string[] = ["CONSTECA", "ALLWV", "ENGLISH", "LO"];
 
 export const PUBLIC_VECTOR_STORES = VECTOR_STORES.filter((store) =>
   PUBLIC_VECTOR_STORE_LABELS.includes(store.label),
