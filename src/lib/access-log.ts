@@ -46,6 +46,8 @@ export function logEvent(data: LogEventData): void {
   try {
     const url = `${API_BASE}/api/logs`;
     const body = JSON.stringify({
+      // Identifica o frontend de origem, distinto do módulo acessado.
+      app: "consbot",
       event: trim(data.event, "feature_access"),
       category: trim(data.category),
       module: trim(data.module),
