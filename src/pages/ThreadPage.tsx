@@ -143,7 +143,7 @@ export function ThreadPage() {
   };
 
   const handleNew = () => {
-    const thread = createThread();
+    const thread = createThread(effectiveSettings);
     persist(upsertThread(threads ?? [], thread));
     goTo(thread.id);
   };
@@ -151,7 +151,7 @@ export function ThreadPage() {
   const handleDelete = (id: string) => {
     const next = deleteThread(threads ?? [], id);
     if (next.length === 0) {
-      const thread = createThread();
+      const thread = createThread(effectiveSettings);
       persist([thread]);
       goTo(thread.id);
       return;
@@ -161,7 +161,7 @@ export function ThreadPage() {
   };
 
   const handleClearAll = () => {
-    const thread = createThread();
+    const thread = createThread(effectiveSettings);
     saveThreads([thread]);
     setThreads([thread]);
     toast.success("Histórico apagado deste navegador");

@@ -67,18 +67,21 @@ export function saveThreads(threads: ChatThread[]) {
   window.localStorage.setItem(THREADS_KEY, JSON.stringify(persistable));
 }
 
-export function createThread(): ChatThread {
+export function createThread(initialSettings?: ChatSettings): ChatThread {
   return {
     id: newId(),
     title: "Nova conversa",
     updatedAt: Date.now(),
     messages: [],
-    settings: { ...DEFAULT_SETTINGS },
+    settings: initialSettings ? { ...initialSettings } : { ...DEFAULT_SETTINGS },
   };
 }
 
 /** Garante que exista uma thread e devolve a lista + o id ativo desejado. */
-export function ensureThread(requestedId?: string): { threads: ChatThread[]; activeId: string } {
+export function ensureThread(
+  requestedId?: string,
+  initialSettings?: ChatSettings,
+): { threads: ChatThread[]; activeId: string } {
   const threads = loadThreads();
   if (requestedId && threads.some((t) => t.id === requestedId)) {
     return { threads, activeId: requestedId };
@@ -86,7 +89,9 @@ export function ensureThread(requestedId?: string): { threads: ChatThread[]; act
   if (!requestedId && threads.length > 0) {
     return { threads, activeId: threads[0]!.id };
   }
-  const thread = requestedId ? { ...createThread(), id: requestedId } : createThread();
+  const thread = requestedId
+    ? { ...createThread(initialSettings), id: requestedId }
+    : createThread(initialSettings);
   const next = [thread, ...threads];
   saveThreads(next);
   return { threads: next, activeId: thread.id };

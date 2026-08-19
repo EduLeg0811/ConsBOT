@@ -219,6 +219,7 @@ export function ChatWindow({
     ),
   );
   const [input, setInput] = useState("");
+  const [hasTyped, setHasTyped] = useState(() => initialMessages.length > 0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
   const [sourceCounts, setSourceCounts] = useState<Record<string, number>>({});
@@ -236,7 +237,7 @@ export function ChatWindow({
   const isEnglish = isEnglishVectorStore(settings.vectorStoreId);
   const llmParameters = [
     `GPT-5.6 ${activeModel?.label.replace("ConsBOT ", "") ?? "Terra"}`,
-    REASONING_LABELS[settings.reasoningEffort],
+    !isMobile ? REASONING_LABELS[settings.reasoningEffort] : undefined,
     { low: "Low verbosity", medium: "Medium verbosity", high: "High verbosity" }[
       settings.textVerbosity
     ],
@@ -426,6 +427,7 @@ export function ChatWindow({
       });
 
       setInput("");
+      setHasTyped(true);
       void sendMessage({
         text: value,
         metadata: { ragVectorStoreId: settingsRef.current.vectorStoreId },
@@ -461,8 +463,7 @@ export function ChatWindow({
   const refreshSuggestions = useCallback(
     async (forcedVectorStoreId?: ChatSettings["vectorStoreId"]) => {
       if (isRefreshingSuggestions || isBusy) return;
-      const isMobileView = typeof window !== "undefined" ? window.innerWidth < 768 : isMobile;
-      const expectedCount = isMobileView ? 2 : 4;
+      const expectedCount = 4;
       setIsRefreshingSuggestions(true);
 
       const targetVectorStoreId = forcedVectorStoreId ?? settingsRef.current.vectorStoreId;
@@ -554,8 +555,8 @@ export function ChatWindow({
         if (completeSuggestions.length !== expectedCount) {
           throw new Error(
             isEnglish
-              ? `The LLM did not return ${expectedCount === 2 ? "two" : "four"} complete questions in British English.`
-              : `A LLM não retornou ${expectedCount === 2 ? "duas" : "quatro"} perguntas completas em português brasileiro.`,
+              ? "The LLM did not return four complete questions in British English."
+              : "A LLM não retornou quatro perguntas completas em português brasileiro.",
           );
         }
         const validThemes = suggestionItems
@@ -583,7 +584,7 @@ export function ChatWindow({
         setIsRefreshingSuggestions(false);
       }
     },
-    [isBusy, isMobile, isRefreshingSuggestions, onAuditComplete, onAuditStart],
+    [isBusy, isRefreshingSuggestions, onAuditComplete, onAuditStart],
   );
 
   const initialSuggestionsRequestedRef = useRef(false);
@@ -741,7 +742,7 @@ export function ChatWindow({
                   </div>
                   {suggestions.length > 0 ? (
                     <div className="grid w-full gap-2 sm:grid-cols-2">
-                      {suggestions.slice(0, isMobile ? 2 : 4).map((suggestion) => (
+                      {suggestions.slice(0, 4).map((suggestion) => (
                         <button
                           key={suggestion}
                           type="button"
@@ -878,12 +879,23 @@ export function ChatWindow({
           <PromptInputTextarea
             ref={textareaRef}
             value={input}
-            onChange={(event) => setInput(event.target.value)}
+            onChange={(event) => {
+              setInput(event.target.value);
+              if (!hasTyped && event.target.value.length > 0) {
+                setHasTyped(true);
+              }
+            }}
             className="field-sizing-content max-h-48 min-h-14 resize-none bg-transparent px-5 py-4 text-base font-chat"
             placeholder={
-              isEnglishVectorStore(settings.vectorStoreId)
-                ? "Hello Conscientiologist! What would you like to discuss today?"
-                : "Olá Conscienciólogo! O que você gostaria de conversar hoje?"
+              hasTyped || messages.length > 0
+                ? ""
+                : isMobile
+                  ? isEnglishVectorStore(settings.vectorStoreId)
+                    ? "Hello Conscientiologist!"
+                    : "Olá Conscienciólogo!"
+                  : isEnglishVectorStore(settings.vectorStoreId)
+                    ? "Hello Conscientiologist! What would you like to discuss today?"
+                    : "Olá Conscienciólogo! O que você gostaria de conversar hoje?"
             }
           />
           <div className="flex shrink-0 items-center pr-2">
