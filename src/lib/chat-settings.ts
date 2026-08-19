@@ -236,7 +236,7 @@ export const VERBOSITY_INSTRUCTIONS: Record<TextVerbosity, string> = {
 };
 
 export const ENGLISH_STORE_INSTRUCTION =
-  "Always reply in British English, including titles of sections and items, unless the user explicitly requests otherwise.";
+  "Always reply in British English, including titles of sections and items, unless the user explicitly requests otherwise. Always employ the specific terminology of Conscientiology in English, as they appear in the provided sources (for example: 'thosene' instead of 'pensene'; 'penta' instead of 'tenepes').";
 
 /** Verifica se a base de conhecimento selecionada é a base em inglês (ENGLISH). */
 export function isEnglishVectorStore(vectorStoreId?: VectorStoreId | null): boolean {
