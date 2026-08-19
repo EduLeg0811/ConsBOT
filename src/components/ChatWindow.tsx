@@ -27,6 +27,7 @@ import {
   type ChatSettings,
 } from "@/lib/chat-settings";
 import { API_BASE } from "@/lib/main-server";
+import { logFeatureAccess } from "@/lib/access-log";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type {
   AuditCompletion,
@@ -43,12 +44,12 @@ function vectorStoresFor(vectorStoreId: ChatSettings["vectorStoreId"]) {
 }
 
 const REASONING_LABELS: Record<ChatSettings["reasoningEffort"], string> = {
-  none: "None",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  xhigh: "Very high",
-  max: "Max",
+  none: "No Effort",
+  low: "Low Effort",
+  medium: "Medium Effort",
+  high: "High Effort",
+  xhigh: "Very High Effort",
+  max: "Max Effort",
 };
 
 const VERBOSITY_LABELS: Record<ChatSettings["textVerbosity"], string> = {
@@ -100,7 +101,7 @@ function isCompleteSuggestion(value: unknown): value is string {
     suggestion.length >= 10 &&
     suggestion.length <= 120 &&
     suggestion.endsWith("?") &&
-    /^[A-Za-zÀ-ÖØ-öø-ÿ0-9 .,;:!?…'"“”‘’()\[\]{}<>/\\—–-]+$/.test(suggestion)
+    /^[A-Za-zÀ-ÖØ-öø-ÿ0-9 .,;:!?…'"“”‘’()[\]{}<>/\\—–-]+$/.test(suggestion)
   );
 }
 
@@ -400,13 +401,37 @@ export function ChatWindow({
           stream: true,
         },
       });
+      const current = settingsRef.current;
+      const store = VECTOR_STORES.find((item) => item.id === current.vectorStoreId);
+      logFeatureAccess({
+        module: "consbot",
+        action: "ask",
+        label: "Pergunta ao ConsBOT",
+        // `value` é a pergunta digitada; o painel a exibe como consulta do usuário.
+        value,
+        chat_id: threadId,
+        meta: {
+          model: MODELS.find((item) => item.id === current.model)?.label ?? current.model,
+          // O rótulo da base diz mais que o `vs_…` no painel; "Nenhuma" quando sem RAG.
+          vector_store: store?.label ?? current.vectorStoreId,
+          // O systemPrompt tem milhares de caracteres e é derivado do formato,
+          // então registra-se o formato, que o identifica sem inflar o log.
+          response_format: current.responseFormat,
+          reasoning_effort: current.reasoningEffort,
+          verbosity: current.textVerbosity,
+          ...(vectorStoresFor(current.vectorStoreId).length > 0
+            ? { vector_max_results: current.vectorMaxResults }
+            : {}),
+        },
+      });
+
       setInput("");
       void sendMessage({
         text: value,
         metadata: { ragVectorStoreId: settingsRef.current.vectorStoreId },
       });
     },
-    [isBusy, messages, onAuditStart, sendMessage],
+    [isBusy, messages, onAuditStart, sendMessage, threadId],
   );
 
   useEffect(() => {
@@ -692,7 +717,7 @@ export function ChatWindow({
 
               {!hasInitialUrlQuestion.current ? (
                 <>
-                    <div className="-mb-3 flex w-full justify-end">
+                  <div className="-mb-3 flex w-full justify-end">
                     <Button
                       type="button"
                       variant="ghost"
