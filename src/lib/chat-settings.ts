@@ -193,8 +193,8 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   vectorStoreId: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
   responseFormat: "conscienciological",
   systemPrompt: CONSCIENTIOLOGICAL_SYSTEM_PROMPT,
-  reasoningEffort: "medium",
-  textVerbosity: "medium",
+  reasoningEffort: "low",
+  textVerbosity: "low",
   vectorMaxResults: 5,
 };
 
