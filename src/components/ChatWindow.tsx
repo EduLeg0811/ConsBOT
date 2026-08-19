@@ -611,10 +611,12 @@ export function ChatWindow({
     const previousStoreId = prevVectorStoreIdRef.current;
     prevVectorStoreIdRef.current = settings.vectorStoreId;
 
+    if (isEnglishVectorStore(previousStoreId) !== isEnglishVectorStore(settings.vectorStoreId)) {
+      setHasTyped(false);
+      previousThemesRef.current = [];
+    }
+
     if (messages.length === 0 && !hasInitialUrlQuestion.current && !isBusy) {
-      if (isEnglishVectorStore(previousStoreId) !== isEnglishVectorStore(settings.vectorStoreId)) {
-        previousThemesRef.current = [];
-      }
       void refreshSuggestions(settings.vectorStoreId);
     }
   }, [isBusy, messages.length, refreshSuggestions, settings.vectorStoreId]);
@@ -828,7 +830,9 @@ export function ChatWindow({
             );
           })}
 
-          {status === "submitted" ? <Shimmer className="text-sm">Pensando...</Shimmer> : null}
+          {status === "submitted" ? (
+            <Shimmer className="text-sm">{isEnglish ? "Thinking..." : "Pensando..."}</Shimmer>
+          ) : null}
 
           {latestAssistantText && !isBusy ? (
             <div className="flex items-center gap-1">
@@ -887,7 +891,7 @@ export function ChatWindow({
             }}
             className="field-sizing-content max-h-48 min-h-14 resize-none bg-transparent px-5 py-4 text-base font-chat"
             placeholder={
-              hasTyped || messages.length > 0
+              hasTyped
                 ? ""
                 : isMobile
                   ? isEnglishVectorStore(settings.vectorStoreId)

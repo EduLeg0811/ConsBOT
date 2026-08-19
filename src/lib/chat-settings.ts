@@ -236,7 +236,7 @@ export const VERBOSITY_INSTRUCTIONS: Record<TextVerbosity, string> = {
 };
 
 export const ENGLISH_STORE_INSTRUCTION =
-  "Because the selected knowledge base is in English (ENGLISH), reply by default in British English unless explicitly requested otherwise by the user";
+  "Always reply in British English, including titles of sections and items, unless the user explicitly requests otherwise.";
 
 /** Verifica se a base de conhecimento selecionada é a base em inglês (ENGLISH). */
 export function isEnglishVectorStore(vectorStoreId?: VectorStoreId | null): boolean {
