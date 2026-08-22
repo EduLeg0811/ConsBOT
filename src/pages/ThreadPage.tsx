@@ -73,9 +73,15 @@ export function ThreadPage() {
   // era um pedido a uma rota serverless própria (ACCESS_LEVEL no ambiente do
   // Vercel), que só ocultava/mostrava controles — o corpo da requisição
   // sempre foi de livre escolha do cliente, com ou sem essa checagem. Sem
-  // backend próprio, isAdmin fica inteiramente no cliente: localhost, ou
-  // VITE_ACCESS_LEVEL=1 definido no build para uma implantação de teste.
+  // backend próprio, isAdmin fica inteiramente no cliente: o dev server, ou
+  // localhost, ou VITE_ACCESS_LEVEL=1 definido no build para uma implantação
+  // de teste.
   const [accessLevel] = useState<0 | 1>(() => {
+    // `npm run dev` é sempre admin. A checagem de hostname abaixo não cobre o
+    // dev aberto pelo IP da LAN (celular na rede); `import.meta.env.DEV` cobre,
+    // e continua falso em qualquer build de produção.
+    if (import.meta.env.DEV) return 1;
+
     const isLocalhost =
       typeof window !== "undefined" &&
       (window.location.hostname === "localhost" ||

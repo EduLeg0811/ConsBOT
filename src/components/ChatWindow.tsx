@@ -28,6 +28,7 @@ import {
 } from "@/lib/chat-settings";
 import { API_BASE } from "@/lib/main-server";
 import { logFeatureAccess } from "@/lib/access-log";
+import { AgentActions } from "@/components/agent/AgentActions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type {
   AuditCompletion,
@@ -868,6 +869,9 @@ export function ChatWindow({
               </Button>
             </div>
           ) : null}
+
+          {/* Módulo AGENT (opt-in): inerte enquanto AGENT_MODE=0. */}
+          <AgentActions threadId={threadId} settings={settings} messages={messages} />
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>

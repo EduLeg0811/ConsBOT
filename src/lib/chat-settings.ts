@@ -1,3 +1,5 @@
+import { AGENT_DETECTION_DEFAULT, AGENT_MODE, type AgentDetectionId } from "@/lib/agent/config";
+
 export const MODELS = [
   {
     id: "gpt-5.6-luna",
@@ -173,6 +175,16 @@ export type ChatSettings = {
   /** Trechos que o file_search devolve por consulta — o `max_num_results` da
    * tool. Enviado como `vectorMaxResults`; o Main-Server o limita a 1..20. */
   vectorMaxResults: number;
+  /** Módulo AGENT ligado nesta sessão. Parte de `AGENT_MODE` (flag de build,
+   * ligada sozinha no dev) e só o admin consegue alterar. Não toca no payload
+   * da LLM: governa apenas os botões de ação sugerida. */
+  agentMode: boolean;
+  /** Como o módulo AGENT detecta a intenção: regras no cliente ou classificação
+   * por LLM. Irrelevante com `agentMode: false`. */
+  agentDetection: AgentDetectionId;
+  /** Instruções do classificador de intenção. Vazio = usar o padrão do idioma
+   * da base ativa (`agentInstructionsFor`); só o admin altera, e só na sessão. */
+  agentPrompt: string;
 };
 
 /** Settings com `responseFormat` novo e o prompt canônico correspondente —
@@ -196,6 +208,9 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   reasoningEffort: "low",
   textVerbosity: "low",
   vectorMaxResults: 5,
+  agentMode: AGENT_MODE,
+  agentDetection: AGENT_DETECTION_DEFAULT,
+  agentPrompt: "",
 };
 
 /** Bases oferecidas com ACCESS_LEVEL=0. As demais de `VECTOR_STORES` —
