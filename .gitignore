@@ -16,6 +16,11 @@ dist-ssr
 .nitro
 *.local
 
+# PIDs das sessões do dev.ps1
+.dev.pid
+.server.pid
+.frontend.pid
+
 # Environment
 .env
 .env.*
