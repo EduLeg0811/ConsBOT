@@ -1,10 +1,5 @@
-import { useState } from "react";
-import { ChevronRight } from "lucide-react";
-
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { AgentSettingsSection } from "@/agent";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -27,13 +22,6 @@ import {
   type ModelId,
   type ResponseFormatId,
 } from "@/lib/chat-settings";
-import {
-  AGENT_CLASSIFIER_MODEL,
-  AGENT_CLASSIFIER_REASONING,
-  AGENT_DETECTIONS,
-  agentInstructionsFor,
-  type AgentDetectionId,
-} from "@/lib/agent/config";
 
 type Props = {
   value: ChatSettings;
@@ -45,8 +33,6 @@ type Props = {
 };
 
 export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Props) {
-  const [agentPromptOpen, setAgentPromptOpen] = useState(false);
-
   return (
     <div className="space-y-6">
       {isAdmin ? (
@@ -209,93 +195,12 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
         </div>
       ) : null}
 
-      {isAdmin ? (
-        <>
-          <Separator />
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="agent-mode">Modo Agente</Label>
-              <Switch
-                id="agent-mode"
-                className="data-[state=checked]:bg-chart-2"
-                checked={draft.agentMode}
-                onCheckedChange={(checked) => setDraft({ ...draft, agentMode: checked })}
-              />
-            </div>
-            {/* <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Botões opcionais de ação ao lado da resposta quando a pergunta pede algo que outro
-              módulo resolve melhor — por exemplo, localizar um termo literal nos livros. Não altera
-              o prompt nem a resposta da LLM.
-            </p> */}
-          </div>
-
-          <div className="space-y-2">
-            <Label>Detecção da intenção</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {AGENT_DETECTIONS.map((mode) => {
-                const selected = draft.agentDetection === mode.id;
-                return (
-                  <button
-                    className={
-                      selected
-                        ? "rounded-lg border border-chart-2 bg-chart-2/15 px-3 py-2 text-left shadow-[0_2px_8px_-5px_oklch(0.45_0.07_215/0.35)] disabled:opacity-50"
-                        : "rounded-lg border border-border bg-card/90 px-3 py-2 text-left transition-colors hover:bg-chart-2/8 disabled:opacity-50"
-                    }
-                    key={mode.id}
-                    type="button"
-                    disabled={!draft.agentMode}
-                    onClick={() =>
-                      setDraft({ ...draft, agentDetection: mode.id as AgentDetectionId })
-                    }
-                  >
-                    <span className="block text-xs font-medium">{mode.label}</span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
-                      {mode.description}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {/*   <p className="text-[11px] leading-relaxed text-muted-foreground">
-              O classificador chama a LLM uma vez por pergunta enviada, além da resposta.
-            </p> */}
-          </div>
-
-          {/* Recolhido por padrão: interessa só a quem for calibrar a detecção,
-              e um segundo textarea aberto competiria com o prompt de sistema. */}
-          <Collapsible open={agentPromptOpen} onOpenChange={setAgentPromptOpen}>
-            <CollapsibleTrigger className="flex w-full items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground">
-              <ChevronRight
-                className={`size-3 transition-transform ${agentPromptOpen ? "rotate-90" : ""}`}
-                aria-hidden="true"
-              />
-              Agent Prompt
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-2 pt-2">
-              <Textarea
-                className="bg-card/90 text-[11px] leading-relaxed shadow-[0_2px_8px_-5px_oklch(0.45_0.07_215/0.35)] md:text-[11px]"
-                value={
-                  draft.agentPrompt ||
-                  agentInstructionsFor(isEnglishVectorStore(draft.vectorStoreId))
-                }
-                rows={6}
-                disabled={!draft.agentMode || draft.agentDetection !== "llm"}
-                onChange={(event) => setDraft({ ...draft, agentPrompt: event.target.value })}
-              />
-              {/* Mesma linha de parâmetros do rodapé do chat, com os valores
-                  fixos desta chamada — ver AGENT_CLASSIFIER_* em agent/config. */}
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                {[
-                  "Classificador LLM",
-                  AGENT_CLASSIFIER_MODEL,
-                  AGENT_CLASSIFIER_REASONING.label,
-                ].join("  ●  ")}
-              </p>
-            </CollapsibleContent>
-          </Collapsible>
-        </>
-      ) : null}
+      <AgentSettingsSection
+        value={draft.agent}
+        onChange={(agent) => setDraft({ ...draft, agent })}
+        isAdmin={isAdmin}
+        english={isEnglishVectorStore(draft.vectorStoreId)}
+      />
     </div>
   );
 }

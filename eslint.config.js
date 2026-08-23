@@ -36,5 +36,47 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+
+  // ── Fronteira do módulo AGENT ──────────────────────────────────────────────
+  // O módulo é autocontido: o que ele precisa do ConsBOT entra pelo AgentHost
+  // (src/agent/host.ts). Importar @/lib ou @/components aqui dentro recria a
+  // amarra que a modularização desfez, e tira a chance de extrair o módulo.
+  {
+    files: ["src/agent/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/lib/*", "@/components/*", "@/pages/*", "@/hooks/*"],
+              message:
+                "O modulo AGENT nao importa do ConsBOT. Precisa de algo do hospedeiro? Acrescente ao AgentHost em src/agent/host.ts.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // O caminho inverso: o ConsBOT fala com o módulo só pela superfície pública.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/agent/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/agent/*"],
+              message: 'Importe de "@/agent" — o indice e a unica superficie publica do modulo.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   eslintPluginPrettier,
 );

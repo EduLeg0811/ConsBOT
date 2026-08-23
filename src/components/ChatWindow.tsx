@@ -28,7 +28,7 @@ import {
 } from "@/lib/chat-settings";
 import { API_BASE } from "@/lib/main-server";
 import { logFeatureAccess } from "@/lib/access-log";
-import { AgentActions } from "@/components/agent/AgentActions";
+import { AgentActions, prepareAgentContext, type AgentHost } from "@/agent";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type {
   AuditCompletion,
@@ -231,11 +231,36 @@ export function ChatWindow({
   const initialUrlQuestionProcessedRef = useRef(false);
   auditCompleteRef.current = onAuditComplete;
 
+  // Bloco que o módulo AGENT injeta no prompt desta requisição, no modo
+  // «Alimentar resposta». Vazio em todos os outros casos — inclusive quando o
+  // planejador decide que a resposta não depende de busca exata.
+  const agentContextRef = useRef("");
+
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const activeModel = MODELS.find((model) => model.id === settings.model);
   const activeVectorStore = VECTOR_STORES.find((store) => store.id === settings.vectorStoreId);
   const isEnglish = isEnglishVectorStore(settings.vectorStoreId);
+
+  // Contrato do módulo AGENT com o ConsBOT: é por aqui que ele alcança a API,
+  // o idioma e a telemetria, sem importar nada de @/lib. Memoizado porque vai
+  // parar num ref lá dentro — identidade nova a cada render dispararia efeito.
+  const agentHost = useMemo<AgentHost>(
+    () => ({
+      apiBase: API_BASE,
+      english: isEnglish,
+      logEvent: (event) =>
+        logFeatureAccess({
+          module: "consbot",
+          action: "agent_action",
+          label: "Ação sugerida",
+          value: event.intent,
+          chat_id: threadId,
+          meta: { rule: event.intent, detection: event.detection, via: event.via, ...event.meta },
+        }),
+    }),
+    [isEnglish, threadId],
+  );
   const llmParameters = [
     `GPT-5.6 ${activeModel?.label.replace("ConsBOT ", "") ?? "Terra"}`,
     !isMobile ? REASONING_LABELS[settings.reasoningEffort] : undefined,
@@ -285,7 +310,8 @@ export function ChatWindow({
               // do server-side, now run here before the request leaves the browser.
               messages: await convertToModelMessages(messages),
               model: settingsRef.current.model,
-              systemPrompt: systemPromptWithVerbosity(settingsRef.current),
+              systemPrompt:
+                systemPromptWithVerbosity(settingsRef.current) + agentContextRef.current,
               reasoningEffort: settingsRef.current.reasoningEffort,
               verbosity: settingsRef.current.textVerbosity,
               vectorStores,
@@ -383,7 +409,7 @@ export function ChatWindow({
   }, [isBusy, messages, onAuditComplete]);
 
   const submit = useCallback(
-    (text: string) => {
+    async (text: string) => {
       const value = text.trim();
       if (!value || isBusy) return;
       openaiAuditRef.current = null;
@@ -429,12 +455,23 @@ export function ChatWindow({
 
       setInput("");
       setHasTyped(true);
+
+      // Único ponto em que o agente atrasa alguma coisa: no modo «Alimentar
+      // resposta» ele planeja e consulta ANTES de a resposta começar. Nos
+      // demais modos devolve string vazia de imediato.
+      agentContextRef.current = await prepareAgentContext({
+        userText: value,
+        settings: settingsRef.current.agent,
+        host: agentHost,
+        threadId,
+      });
+
       void sendMessage({
         text: value,
         metadata: { ragVectorStoreId: settingsRef.current.vectorStoreId },
       });
     },
-    [isBusy, messages, onAuditStart, sendMessage, threadId],
+    [agentHost, isBusy, messages, onAuditStart, sendMessage, threadId],
   );
 
   useEffect(() => {
@@ -455,7 +492,7 @@ export function ChatWindow({
 
       if (trimmed && !initialUrlQuestionProcessedRef.current) {
         initialUrlQuestionProcessedRef.current = true;
-        submit(trimmed);
+        void submit(trimmed);
       }
     }
   }, [searchParams, setSearchParams, submit]);
@@ -749,7 +786,7 @@ export function ChatWindow({
                         <button
                           key={suggestion}
                           type="button"
-                          onClick={() => submit(suggestion)}
+                          onClick={() => void submit(suggestion)}
                           className="rounded-xl border border-border bg-card/80 px-3.5 py-2 text-left text-xs font-chat text-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
                         >
                           {suggestion}
@@ -871,7 +908,12 @@ export function ChatWindow({
           ) : null}
 
           {/* Módulo AGENT (opt-in): inerte enquanto AGENT_MODE=0. */}
-          <AgentActions threadId={threadId} settings={settings} messages={messages} />
+          <AgentActions
+            threadId={threadId}
+            settings={settings.agent}
+            host={agentHost}
+            messages={messages}
+          />
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
@@ -881,7 +923,7 @@ export function ChatWindow({
           className="[&_[data-slot=input-group]]:rounded-[28px] [&_[data-slot=input-group]]:border-border/70 [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-[0_3px_14px_-5px_oklch(0.3_0.02_155/0.22)]"
           onSubmit={(message, event) => {
             event.preventDefault();
-            submit(message.text || input);
+            void submit(message.text || input);
           }}
         >
           <PromptInputTextarea
