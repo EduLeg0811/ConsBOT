@@ -1,6 +1,6 @@
 import { AGENT_CONTEXT_ITEMS } from "@/agent/config";
 import { planAgent } from "@/agent/planner/plan";
-import { executeAgentAction } from "@/agent/tools/registry";
+import { executeAgentAction, rememberCard } from "@/agent/tools/registry";
 import type { AgentCard, AgentContext } from "@/agent/types";
 
 /** Cabeçalho do bloco injetado. Diz à LLM que aquilo é DADO, não instrução —
@@ -46,7 +46,14 @@ export async function prepareAgentContext(ctx: AgentContext): Promise<string> {
 
     const cards = await Promise.all(
       plan.actions.map((action) =>
-        executeAgentAction(action, ctx).catch(() => null as AgentCard | null),
+        executeAgentAction(action, ctx)
+          .then((card) => {
+            // O botão do card continua na tela depois da resposta; guardar
+            // aqui evita repetir a mesma consulta ao clicar nele.
+            rememberCard(action, card);
+            return card;
+          })
+          .catch(() => null as AgentCard | null),
       ),
     );
 

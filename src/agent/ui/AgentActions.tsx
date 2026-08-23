@@ -4,7 +4,7 @@ import { ExternalLink, Search } from "lucide-react";
 import { AgentCard } from "@/agent/ui/AgentCard";
 import { planAgent } from "@/agent/planner/plan";
 import { detectActions } from "@/agent/planner/rules";
-import { executeAgentAction } from "@/agent/tools/registry";
+import { executeAgentAction, recallCard } from "@/agent/tools/registry";
 import type { AgentHost } from "@/agent/host";
 import type { AgentSettings } from "@/agent/settings";
 import type {
@@ -54,9 +54,11 @@ export function AgentActions({ threadId, settings, host, messages }: Props) {
   const assistant = lastMessageOf(messages, "assistant");
   const enabled = settings.enabled;
   const detection = settings.detection;
-  // Consultar a API em vez de abrir o módulo externo só existe sob o
-  // classificador; em `rules` o botão é sempre link.
-  const apiMode = detection === "llm" && settings.action === "api";
+  // O botão abre o card em vez de outra aba nos dois modos que consultam a
+  // API. Em «Alimentar resposta» a consulta já aconteceu antes da resposta,
+  // e o botão serve para VER o que alimentou — sem repetir a busca.
+  // Sob a detecção por Regras o botão é sempre link.
+  const cardMode = detection === "llm" && settings.action !== "link";
   const english = host.english;
 
   // O contexto muda de identidade a cada render (ThreadPage remonta as settings
@@ -92,10 +94,7 @@ export function AgentActions({ threadId, settings, host, messages }: Props) {
     // isto reaproveita — e não custa uma segunda chamada.
     let current = true;
     void planAgent(ctxRef.current).then((plan) => {
-      // No modo «Alimentar resposta» o resultado já foi para o prompt; só há
-      // botão quando o planejador pediu as duas entregas.
-      const suppressed = ctxRef.current.settings.action === "context" && plan.delivery !== "both";
-      if (current) setLlmActions(suppressed ? [] : plan.actions);
+      if (current) setLlmActions(plan.actions);
     });
 
     return () => {
@@ -105,7 +104,7 @@ export function AgentActions({ threadId, settings, host, messages }: Props) {
 
   // Cada mensagem começa sem cards: o resultado da anterior não vale para a
   // pergunta nova. Vivem só na sessão, como as settings.
-  useEffect(() => setCards({}), [user?.id, apiMode]);
+  useEffect(() => setCards({}), [user?.id, cardMode]);
 
   const openExternal = useCallback(
     (action: AgentAction, via: "link" | "api" | "card-footer") => {
@@ -117,7 +116,18 @@ export function AgentActions({ threadId, settings, host, messages }: Props) {
 
   const runSearch = useCallback(
     (action: AgentAction) => {
-      const term = action.meta?.term ?? "";
+      // No modo «Alimentar resposta» esta consulta já foi feita antes da
+      // resposta; então o card abre na hora, sem ir à rede de novo.
+      const known = recallCard(action);
+      if (known) {
+        setCards((current) => ({
+          ...current,
+          [action.id]: { loading: false, error: null, card: known },
+        }));
+        host.logEvent({ intent: action.id, via: "api", detection, meta: action.meta });
+        return;
+      }
+
       setCards((current) => ({
         ...current,
         [action.id]: { loading: true, error: null, card: null },
@@ -156,7 +166,7 @@ export function AgentActions({ threadId, settings, host, messages }: Props) {
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         {actions.map((action) =>
-          apiMode ? (
+          cardMode ? (
             <button
               key={action.id}
               type="button"
@@ -189,7 +199,7 @@ export function AgentActions({ threadId, settings, host, messages }: Props) {
         )}
       </div>
 
-      {apiMode
+      {cardMode
         ? actions
             .filter((action) => cards[action.id])
             .map((action) => (

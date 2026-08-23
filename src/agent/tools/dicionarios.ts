@@ -1,5 +1,5 @@
 import { AGENT_SEARCH_LIMIT, AGENT_TARGETS } from "@/agent/config";
-import { asArray, asRecord, get, href, plain } from "@/agent/tools/lib/api";
+import { asArray, asRecord, get, href, markdown, plain } from "@/agent/tools/lib/api";
 import type { AgentCardItem, AgentTool } from "@/agent/types";
 
 /** Consulta aos dicionários de português. Ficha 4 de docs/agent-rules.docx.
@@ -49,7 +49,7 @@ export const dicionarios: AgentTool = {
 
         items.push({
           source: sectionTitle ? `${label} · ${sectionTitle}` : label,
-          snippet: plain(first.contexto) || plain(item.classe, 120),
+          snippet: markdown(first.contexto) || markdown(item.classe, 120),
         });
       }
     }

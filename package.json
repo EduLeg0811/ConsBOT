@@ -6,6 +6,7 @@
     "dev": "vite",
     "dev:all": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./dev.ps1",
     "dev:silent": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./dev.ps1 -Silent",
+    "agent:suite": "node scripts/agent-planner-suite.mjs",
     "dev:stop": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./dev.ps1 -Stop",
     "build": "tsc -b && vite build",
     "preview": "vite preview",

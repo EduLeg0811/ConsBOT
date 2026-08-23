@@ -1,5 +1,5 @@
 import { AGENT_TARGETS } from "@/agent/config";
-import { asRecord, href, plain, post } from "@/agent/tools/lib/api";
+import { asRecord, href, markdown, plain, post } from "@/agent/tools/lib/api";
 import { cleanTerm, isUsableTerm, QUOTED_TERM } from "@/agent/tools/lib/text";
 import type { AgentCardItem, AgentTool } from "@/agent/types";
 
@@ -67,7 +67,7 @@ export const bibliografia: AgentTool = {
 
   execute: async ({ term }, { host }, signal) => {
     const data = asRecord(await post(host, "/api/biblio/wv/reference", { book: term }, signal));
-    const reference = plain(data.text, 600);
+    const reference = markdown(data.text, 600);
     const items: AgentCardItem[] = reference
       ? [{ source: plain(data.book_title, 80) || term, snippet: reference }]
       : [];

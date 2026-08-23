@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
+import { Streamdown } from "streamdown";
 
 import { AGENT_CARD_PREVIEW } from "@/agent/config";
 import type { AgentAction, AgentCard as AgentCardData } from "@/agent/types";
@@ -73,7 +74,13 @@ export function AgentCard({ action, card, loading, error, english, onOpenExterna
               {item.source ? (
                 <p className="text-[11px] font-medium text-chart-2">{item.source}</p>
               ) : null}
-              <p className="mt-0.5 text-xs leading-relaxed text-foreground/85">{item.snippet}</p>
+              {/* Os trechos vêm do corpus com marcação (**Definologia**, termos
+                  em itálico). Renderizar como markdown preserva a ênfase que o
+                  autor deu; sem isso, ou os asteriscos apareciam na tela, ou a
+                  ênfase se perdia ao ser removida. */}
+              <Streamdown className="agent-card-snippet mt-0.5 text-xs leading-relaxed text-foreground/85 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>p]:m-0 [&_[data-streamdown='strong']]:font-semibold [&_strong]:font-semibold">
+                {item.snippet}
+              </Streamdown>
             </li>
           ))}
         </ul>

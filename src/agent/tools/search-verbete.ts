@@ -1,5 +1,5 @@
 import { AGENT_SEARCH_LIMIT, AGENT_TARGETS, AGENT_VERBETE_FIELDS } from "@/agent/config";
-import { asArray, asRecord, href, plain, post } from "@/agent/tools/lib/api";
+import { asArray, asRecord, href, markdown, plain, post } from "@/agent/tools/lib/api";
 import {
   BIBLIO_CONTEXT,
   BOOK_TARGET,
@@ -67,10 +67,12 @@ export const searchVerbete: AgentTool = {
       ? [
           "search_verbete — same as search_book, but in the VERBETES of the Encyclopedia of Conscientiology: the user says verbete, verbetes, Enciclopédia or Definologia. When they do not say where to look, return both search_book and search_verbete. term holds only the word or expression being looked for.",
           "In this intent, field says which column to search: titulo when the user asks about the title or names the verbete; autor when they ask who wrote it; especialidade when they ask about the area or speciality. Leave field empty for a search in the Definologia text, which is the common case. In the other three intents field is always empty.",
+          "Here too the term is not always quoted, and the absence of quotes changes nothing.",
         ].join("\n")
       : [
           "search_verbete — igual a search_book, mas nos VERBETES da Enciclopédia da Conscienciologia: o usuário diz verbete, verbetes, Enciclopédia ou Definologia. Quando ele não disser onde procurar, devolva as duas: search_book e search_verbete. Em term vai apenas a palavra ou expressão procurada.",
           "Nesta intenção, field diz por qual campo procurar: titulo quando o usuário pergunta pelo título ou nomeia o verbete; autor quando pergunta quem escreveu ou pelo verbetógrafo; especialidade quando pergunta pela área ou especialidade. Deixe field vazio para busca no texto da Definologia, que é o caso comum. Nas outras três intenções field é sempre vazio.",
+          "Aqui também o termo procurado nem sempre vem entre aspas, e a falta delas não muda nada.",
         ].join("\n"),
 
   rule: ({ userText }) => {
@@ -122,7 +124,7 @@ export const searchVerbete: AgentTool = {
 
     const items: AgentCardItem[] = asArray(data.results).map((raw) => {
       const row = asRecord(raw);
-      return { source: plain(row.title, 80), snippet: plain(row.text) };
+      return { source: plain(row.title, 80), snippet: markdown(row.text) };
     });
 
     // `totalFound` é o total no corpus (saturado em 200 pelo servidor);

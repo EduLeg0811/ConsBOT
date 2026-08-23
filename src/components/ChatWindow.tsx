@@ -28,7 +28,7 @@ import {
 } from "@/lib/chat-settings";
 import { API_BASE } from "@/lib/main-server";
 import { logFeatureAccess } from "@/lib/access-log";
-import { AgentActions, prepareAgentContext, type AgentHost } from "@/agent";
+import { AgentActions, AgentStatus, prepareAgentContext, type AgentHost } from "@/agent";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type {
   AuditCompletion,
@@ -864,6 +864,7 @@ export function ChatWindow({
                     <span>{ragStatus}</span>
                   </div>
                 ) : null}
+                {message.role === "user" ? <AgentStatus settings={settings.agent} /> : null}
               </div>
             );
           })}

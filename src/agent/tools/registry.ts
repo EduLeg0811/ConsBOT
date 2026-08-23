@@ -4,6 +4,7 @@ import { searchBook } from "@/agent/tools/search-book";
 import { searchVerbete } from "@/agent/tools/search-verbete";
 import type {
   AgentAction,
+  AgentCard,
   AgentContext,
   AgentIntentId,
   AgentMatch,
@@ -71,4 +72,29 @@ export function executeAgentAction(action: AgentAction, ctx: AgentContext, signa
   };
 
   return tool.execute(match, ctx, signal);
+}
+
+/* ───────────────────────── resultados já buscados ───────────────────────────
+ * No modo «Alimentar resposta» a consulta acontece ANTES da resposta, e o
+ * botão do card continua disponível depois. Sem esta memória, clicar nele
+ * repetiria uma consulta que já foi feita segundos antes.
+ *
+ * Guarda poucos e é volátil de propósito: serve à mensagem em curso, não é
+ * cache de verdade. A chave inclui os parâmetros, então mudar de obra ou de
+ * campo busca de novo, como deve. */
+const RECENT_LIMIT = 4;
+const recent = new Map<string, AgentCard>();
+
+function cardKey(action: AgentAction): string {
+  const { term = "", field = "", book = "" } = action.meta ?? {};
+  return `${action.id}:${term}:${field}:${book}`;
+}
+
+export function rememberCard(action: AgentAction, card: AgentCard): void {
+  if (recent.size >= RECENT_LIMIT) recent.delete(recent.keys().next().value as string);
+  recent.set(cardKey(action), card);
+}
+
+export function recallCard(action: AgentAction): AgentCard | undefined {
+  return recent.get(cardKey(action));
 }

@@ -10,7 +10,7 @@
  *  pelo `AgentHost`.
  *
  *  São quatro pontos de contato no ConsBOT, um por export:
- *   1. ChatWindow monta <AgentActions />;
+ *   1. ChatWindow monta <AgentActions /> e <AgentStatus />;
  *   2. SettingsFields monta <AgentSettingsSection />;
  *   3. chat-settings.ts carrega `agent: AgentSettings`, um bloco opaco;
  *   4. ChatWindow chama prepareAgentContext() antes de enviar, e anexa o que
@@ -24,6 +24,7 @@
  *  juntos.
  */
 export { AgentActions } from "@/agent/ui/AgentActions";
+export { AgentStatus } from "@/agent/ui/AgentStatus";
 export { prepareAgentContext } from "@/agent/planner/context";
 export { AgentSettingsSection } from "@/agent/ui/AgentSettingsSection";
 export { AGENT_SETTINGS_DEFAULT, type AgentSettings } from "@/agent/settings";

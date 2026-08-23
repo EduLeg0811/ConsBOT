@@ -1,5 +1,5 @@
 import { AGENT_BOOK_IDS, AGENT_SEARCH_LIMIT, AGENT_TARGETS, agentBookLabel } from "@/agent/config";
-import { asArray, asRecord, href, plain, post } from "@/agent/tools/lib/api";
+import { asArray, asRecord, href, markdown, plain, post } from "@/agent/tools/lib/api";
 import {
   BIBLIO_CONTEXT,
   BOOK_TARGET,
@@ -28,10 +28,12 @@ export const searchBook: AgentTool = {
     english
       ? [
           "search_book — the user wants to FIND a literal word or expression in the books: where it appears, in which works, on which pages, or to see the passages quoting it. Do NOT use it when they want the meaning, explanation, application or discussion of a concept, even if a technical term is mentioned. term holds only the word or expression being looked for.",
+          "The term is not always quoted, and the absence of quotes changes nothing: «search for the term tenepes» and «where does the word holopensene appear?» are literal searches just like the quoted ones.",
           "In this intent, book takes the id of the work when the user names one (for example: LO for Léxico de Ortopensatas, PROJ for Projeciologia, TNP for Manual da Tenepes). Leave book empty when no work is named, which searches all of them. The Encyclopedia of Conscientiology does not belong here: mentioning it means search_verbete.",
         ].join("\n")
       : [
           "search_book — o usuário quer ENCONTRAR uma palavra ou expressão literal nos livros: onde ela aparece, em quais obras, em que páginas, ou ver as citações em que ocorre. NÃO use quando ele quer o significado, a explicação, a aplicação ou a discussão de um conceito, ainda que cite um termo técnico. Em term vai apenas a palavra ou expressão procurada.",
+          "O termo procurado nem sempre vem entre aspas, e a falta delas não muda nada: «Busque o termo tenepes» e «onde aparece a palavra holopensene?» são pedidos de busca literal exatamente como os que trazem aspas.",
           "Nesta intenção, book recebe o id da obra quando o usuário a nomeia (por exemplo: LO para o Léxico de Ortopensatas, PROJ para Projeciologia, TNP para o Manual da Tenepes). Deixe book vazio quando ele não nomear obra nenhuma, o que busca em todas. A Enciclopédia da Conscienciologia não entra aqui: quem a menciona quer search_verbete.",
         ].join("\n"),
 
@@ -86,7 +88,7 @@ export const searchBook: AgentTool = {
       const meta = asRecord(row.metadata);
       const page = meta.page ? `, p. ${String(meta.page)}` : "";
 
-      return { source: `${String(row.source ?? "")}${page}`, snippet: plain(row.text) };
+      return { source: `${String(row.source ?? "")}${page}`, snippet: markdown(row.text) };
     });
 
     return { intent: "search_book", term, total: items.length, items };
