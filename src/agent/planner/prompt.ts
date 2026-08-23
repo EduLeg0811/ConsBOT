@@ -10,12 +10,14 @@ const PREAMBLE_PT = [
   "Você classifica a intenção de UMA pergunta feita a um assistente de Conscienciologia.",
   "Devolva `actions`: no máximo 2 ações, ou lista vazia quando nenhuma se aplicar. Lista vazia é a resposta correta na grande maioria das perguntas.",
   "Na dúvida, devolva lista vazia: um botão indevido atrapalha mais do que a ausência dele.",
+  "Ao extrair o term, corrija erro evidente de digitação: quem escreve «trnnsmentor» quer «Transmentor», e a busca é literal — o termo errado não encontra nada. Corrija apenas quando a palavra pretendida for inequívoca; na dúvida, mantenha o que o usuário escreveu. Jamais troque um neologismo BEM GRAFADO por palavra comum parecida: invéxis, proéxis, conscin, consciex, tenepes e holopensene vão como estão. Neologismo MAL grafado, porém, corrige-se para a forma correta do corpus: «holopnsene» vira «holopensene», «tenpes» vira «tenepes».",
 ].join("\n");
 
 const PREAMBLE_EN = [
   "You classify the intent of ONE question asked to a Conscientiology assistant.",
   "Return `actions`: at most 2 actions, or an empty list when none applies. An empty list is the correct answer for the vast majority of questions.",
   "When in doubt return an empty list: an unwarranted button is worse than no button.",
+  "When extracting term, fix obvious typos: someone who writes «trnnsmentor» means «Transmentor», and the lookup is literal — the misspelt term finds nothing. Only fix it when the intended word is unmistakable; when in doubt, keep what the user wrote. Never replace a CORRECTLY SPELLED neologism with a similar common word: invéxis, proéxis, conscin, consciex, tenepes and holopensene go through untouched. A MISSPELT neologism, however, is corrected to its proper form in the corpus: «holopnsene» becomes «holopensene».",
 ].join("\n");
 
 const CLOSING_PT = [

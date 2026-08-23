@@ -181,6 +181,11 @@ async function main() {
 
     // Parâmetro esperado que não veio é falha silenciosa: o botão aparece,
     // mas buscando na obra errada ou no campo errado.
+    // O termo errado busca literalmente e não acha nada; o termo deturpado
+    // acha a coisa errada. Os dois são falha silenciosa.
+    if (testCase.term && !runs.every((r) => r.args.some((a) => a.term === testCase.term))) {
+      flags.push(`term≠${testCase.term}`);
+    }
     if (testCase.book && !runs.every((r) => r.args.some((a) => a.book === testCase.book))) {
       flags.push(`book≠${testCase.book}`);
     }

@@ -12,7 +12,12 @@
  */
 export const CASES = [
   // ── Ficha 1 · search_book ────────────────────────────────────────────────
-  { ficha: 1, q: "localize a palavra “consciex” nos livros", expect: ["search_book"] },
+  {
+    ficha: 1,
+    q: "localize a palavra “consciex” nos livros",
+    expect: ["search_book"],
+    term: "consciex",
+  },
   { ficha: 1, q: "Busque o termo tenepes", expect: ["search_book", "search_verbete"] },
   {
     ficha: 1,
@@ -25,7 +30,13 @@ export const CASES = [
     q: "Encontre citações sobre “autopesquisa”",
     expect: ["search_book", "search_verbete"],
   },
-  { ficha: 1, q: "cite trechos com a palavra invéxis", expect: ["search_book", "search_verbete"] },
+  // Controle: neologismo do corpus não pode virar palavra comum parecida.
+  {
+    ficha: 1,
+    q: "cite trechos com a palavra invéxis",
+    expect: ["search_book", "search_verbete"],
+    term: "invéxis",
+  },
   { ficha: 1, q: "em que páginas aparece o termo “Waldo”", expect: ["search_book"] },
   {
     ficha: 1,
@@ -40,6 +51,14 @@ export const CASES = [
     ficha: 1,
     q: "where does the expression “holosoma” appear?",
     expect: ["search_book", "search_verbete"],
+  },
+  // Grafia errada: a busca é literal, então o termo tem de sair corrigido.
+  { ficha: 1, q: "busque trnnsmentor nos livros", expect: ["search_book"], term: "Transmentor" },
+  {
+    ficha: 2,
+    q: "onde aparece holopnsene nos verbetes?",
+    expect: ["search_verbete"],
+    term: "holopensene",
   },
   { ficha: 1, q: "O que é a Conscienciologia?", expect: [] },
   { ficha: 1, q: "Explique o conceito de holopensene", expect: [] },
@@ -63,15 +82,22 @@ export const CASES = [
   { ficha: 2, q: "em quais verbetes aparece “waldo”?", expect: ["search_verbete"] },
   {
     ficha: 2,
+    // O term é o TÍTULO; o autor é a resposta, não o campo de busca.
     q: "Quem é o autor do verbete “Sursum Conscientia”?",
     expect: ["search_verbete"],
-    field: "autor",
+    field: "titulo",
   },
   {
     ficha: 2,
     q: "Que verbetes são da especialidade “Evoluciologia”?",
     expect: ["search_verbete"],
     field: "especialidade",
+  },
+  {
+    ficha: 2,
+    q: "que verbetes o Waldo Vieira escreveu?",
+    expect: ["search_verbete"],
+    field: "autor",
   },
   { ficha: 2, q: "Discuta o verbete “Sursum Conscientia”", expect: [] },
   { ficha: 2, q: "Sobre o que o verbete “Sursum Conscientia” fala?", expect: [] },

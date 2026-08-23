@@ -31,10 +31,11 @@
  *   2. Sem essa variável, o dev (`npm run dev`) liga sozinho. `import.meta.env.DEV`
  *      é do Vite e vale só no dev server: nenhum build de produção entra aqui,
  *      nem rodando na mesma máquina, nem aberto pelo IP da LAN.
- *   3. Em build, vale AGENT_MODE_DEFAULT — troque para 1 para ligar em produção.
+ *   3. Em build, vale AGENT_MODE_DEFAULT, hoje 1: o módulo vai ligado para
+ *      produção. Troque para 0 para desligá-lo em todos os builds de uma vez.
  */
-// Anotado como `number` de propósito: sem isso o TS trava o literal em 0 e
-// acusa a comparação `=== 1` como impossível quando você trocar o valor.
+// Anotado como `number` de propósito: sem isso o TS trava o literal e acusa a
+// comparação `=== 1` como impossível quando o valor mudar.
 const AGENT_MODE_DEFAULT: number = 0;
 
 const agentModeOverride = String(import.meta.env.VITE_AGENT_MODE ?? "").trim();
@@ -70,15 +71,15 @@ const stripQuery = (url: string) => url.replace(/[?&]+$/, "");
 export const AGENT_TARGETS: Record<AgentIntentId, string> = {
   search_book: stripQuery(
     String(import.meta.env.VITE_SEARCH_BOOK_URL || "").trim() ||
-      "https://cons-ia.org/index_search_book.html",
+    "https://cons-ia.org/index_search_book.html",
   ),
   search_verbete: stripQuery(
     String(import.meta.env.VITE_SEARCH_VERBETE_URL || "").trim() ||
-      "https://cons-ia.org/index_search_verb.html",
+    "https://cons-ia.org/index_search_verb.html",
   ),
   bibliografia_livros: stripQuery(
     String(import.meta.env.VITE_BIBLIOGRAPHY_URL || "").trim() ||
-      "https://cons-ia.org/index_biblio_wv.html",
+    "https://cons-ia.org/index_biblio_wv.html",
   ),
   consulta_dicionarios: stripQuery(
     String(import.meta.env.VITE_LEXICONS_URL || "").trim() || "https://lexicons.cons-ia.org/",
@@ -125,7 +126,10 @@ export const AGENT_DETECTIONS = [
 
 export type AgentDetectionId = (typeof AGENT_DETECTIONS)[number]["id"];
 
-export const AGENT_DETECTION_DEFAULT: AgentDetectionId = "rules";
+/** Padrão da sessão. O classificador é o caminho principal: alcança as quatro
+ * ferramentas, entende paráfrase e corrige grafia. As regras ficam como plano
+ * B, para quando o Main-Server estiver fora. */
+export const AGENT_DETECTION_DEFAULT: AgentDetectionId = "llm";
 
 /** Modelo da classificação: o mais barato/rápido do catálogo, já que a tarefa
  * é rotular uma frase curta, não redigir. Mesmo usado nas sugestões iniciais. */
@@ -155,12 +159,12 @@ export const AGENT_LLM_MODES = [
   },
   {
     id: "api",
-    label: "Buscar aqui",
+    label: "Busca Integrada",
     description: "Consulta a API e mostra num card.",
   },
   {
     id: "context",
-    label: "Alimentar resposta",
+    label: "Alimentar LLM",
     description: "Busca antes e entrega à LLM.",
   },
 ] as const;

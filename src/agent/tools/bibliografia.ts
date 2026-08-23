@@ -1,5 +1,5 @@
 import { AGENT_TARGETS } from "@/agent/config";
-import { asRecord, href, markdown, plain, post } from "@/agent/tools/lib/api";
+import { asArray, asRecord, get, href, markdown, plain, post } from "@/agent/tools/lib/api";
 import { cleanTerm, isUsableTerm, QUOTED_TERM } from "@/agent/tools/lib/text";
 import type { AgentCardItem, AgentTool } from "@/agent/types";
 
@@ -66,6 +66,24 @@ export const bibliografia: AgentTool = {
   }),
 
   execute: async ({ term }, { host }, signal) => {
+    // Sem título não há referência a montar: `/reference` exige o livro e
+    // responde 400. O pedido genérico («como citar as obras do Waldo») é
+    // atendido listando o que existe para citar, que é a resposta possível.
+    if (!term) {
+      const data = asRecord(await get(host, "/api/biblio/wv/books", signal));
+      const items: AgentCardItem[] = asArray(data.books).map((raw) => {
+        const book = asRecord(raw);
+        const sigla = plain(book.sigla, 12);
+
+        return {
+          source: plain(book.titulo, 80),
+          snippet: sigla ? `Sigla: ${sigla}` : "",
+        };
+      });
+
+      return { intent: "bibliografia_livros", term, total: items.length, items };
+    }
+
     const data = asRecord(await post(host, "/api/biblio/wv/reference", { book: term }, signal));
     const reference = markdown(data.text, 600);
     const items: AgentCardItem[] = reference
