@@ -412,14 +412,14 @@ export function ChatWindow({
   }, [messages, isBusy]);
 
   useEffect(() => {
-    if (!isBusy) {
+    if (!isBusy && !isMobile) {
       textareaRef.current?.focus();
       if (textareaRef.current && input) {
         const len = textareaRef.current.value.length;
         textareaRef.current.setSelectionRange(len, len);
       }
     }
-  }, [isBusy, threadId, input]);
+  }, [isBusy, isMobile, threadId, input]);
 
   useEffect(() => {
     if (isBusy || !pendingAuditId.current) return;
@@ -834,8 +834,8 @@ export function ChatWindow({
           {messages.length === 0 ? (
             <div className="flex flex-col items-center gap-3 pt-0 sm:gap-6 sm:pt-4">
               <div className="flex flex-col items-center gap-2 text-center">
-                {/* Exemplo: 26px no mobile e 40px no desktop */}
-                <h2 className="font-display text-[26px] font-normal leading-[1.02] text-foreground sm:text-[40px] sm:leading-[1.05]">
+                {/* 22px no mobile e 40px no desktop */}
+                <h2 className="font-display text-[22px] font-normal leading-[1.05] text-foreground sm:text-[40px]">
                   {isEnglishVectorStore(settings.vectorStoreId) ? (
                     <>
                       Artificial Intelligence
