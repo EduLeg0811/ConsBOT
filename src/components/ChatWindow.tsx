@@ -121,9 +121,9 @@ function getRagStatus(
   const metadata = userMessage.metadata;
   const vectorStoreId =
     metadata &&
-    typeof metadata === "object" &&
-    "ragVectorStoreId" in metadata &&
-    typeof metadata.ragVectorStoreId === "string"
+      typeof metadata === "object" &&
+      "ragVectorStoreId" in metadata &&
+      typeof metadata.ragVectorStoreId === "string"
       ? (metadata.ragVectorStoreId as ChatSettings["vectorStoreId"])
       : fallbackVectorStoreId;
   const vectorStoreLabel = VECTOR_STORES.find((store) => store.id === vectorStoreId)?.label;
@@ -132,13 +132,12 @@ function getRagStatus(
   const isEnglish = isEnglishVectorStore(vectorStoreId);
 
   return fileSearchPart.state === "output-available"
-    ? `${storeDetail}${
-        totalFiles === undefined
-          ? ""
-          : isEnglish
-            ? ` · ${totalFiles} source${totalFiles === 1 ? "" : "s"}`
-            : ` · ${totalFiles} fonte${totalFiles === 1 ? "" : "s"}`
-      }`
+    ? `${storeDetail}${totalFiles === undefined
+      ? ""
+      : isEnglish
+        ? ` · ${totalFiles} source${totalFiles === 1 ? "" : "s"}`
+        : ` · ${totalFiles} fonte${totalFiles === 1 ? "" : "s"}`
+    }`
     : isEnglish
       ? `Querying ${storeDetail}…`
       : `Consultando ${storeDetail}…`;
@@ -304,7 +303,7 @@ export function ChatWindow({
     `GPT-5.6 ${activeModel?.label.replace("ConsBOT ", "") ?? "Terra"}`,
     !isMobile ? REASONING_LABELS[settings.reasoningEffort] : undefined,
     { low: "Low verbosity", medium: "Medium verbosity", high: "High verbosity" }[
-      settings.textVerbosity
+    settings.textVerbosity
     ],
     settings.vectorStoreId === "none"
       ? isEnglish
@@ -359,9 +358,9 @@ export function ChatWindow({
               // a requisição realmente usa.
               ...(vectorStores.length > 0
                 ? {
-                    toolChoice: { type: "file_search" },
-                    vectorMaxResults: settingsRef.current.vectorMaxResults,
-                  }
+                  toolChoice: { type: "file_search" },
+                  vectorMaxResults: settingsRef.current.vectorMaxResults,
+                }
                 : {}),
               stream: true,
             },
@@ -429,11 +428,11 @@ export function ChatWindow({
         openaiRequest: openaiAuditRef.current?.request,
         response: openaiAuditRef.current
           ? {
-              responseId: openaiAuditRef.current.responseId,
-              model: openaiAuditRef.current.model,
-              finishReason: openaiAuditRef.current.finishReason,
-              usage: openaiAuditRef.current.usage,
-            }
+            responseId: openaiAuditRef.current.responseId,
+            model: openaiAuditRef.current.model,
+            finishReason: openaiAuditRef.current.finishReason,
+            usage: openaiAuditRef.current.usage,
+          }
           : { aviso: "O stream terminou sem metadados de auditoria da OpenAI." },
         uiResponse: lastAssistant,
       });
@@ -511,12 +510,12 @@ export function ChatWindow({
       const triage = forceFull
         ? { mode: "full" as const, answer: "", context: "" }
         : await triageAgent({
-            userText: value,
-            assistantText: historico,
-            settings: settingsRef.current.agent,
-            host: agentHost,
-            threadId,
-          });
+          userText: value,
+          assistantText: historico,
+          settings: settingsRef.current.agent,
+          host: agentHost,
+          threadId,
+        });
 
       // A triagem resolveu sozinha: a resposta é curta e a busca vem nos pills.
       // Só intercepta para exibir a resposta curta e o pill «Resposta completa»
@@ -607,38 +606,38 @@ export function ChatWindow({
         previousThemesRef.current.length > 0
           ? isEnglish
             ? `\nConscientiology themes/concepts already covered previously in this session (DO NOT repeat or approach these themes):\n${previousThemesRef.current
-                .map((theme) => `- ${theme}`)
-                .join(
-                  "\n",
-                )}\n\nChoose completely new and distinct themes within the wide universe of Conscientiology.\n`
+              .map((theme) => `- ${theme}`)
+              .join(
+                "\n",
+              )}\n\nChoose completely new and distinct themes within the wide universe of Conscientiology.\n`
             : `\nTemáticas/conceitos da Conscienciologia já abordados anteriormente nesta sessão (NÃO repita nem se aproxime dessas temáticas):\n${previousThemesRef.current
-                .map((theme) => `- ${theme}`)
-                .join(
-                  "\n",
-                )}\n\nEscolha temáticas completamente inéditas e distintas dentro do amplo universo da Conscienciologia.\n`
+              .map((theme) => `- ${theme}`)
+              .join(
+                "\n",
+              )}\n\nEscolha temáticas completamente inéditas e distintas dentro do amplo universo da Conscienciologia.\n`
           : "";
 
       const prompt = isEnglish
         ? `Generate exactly ${expectedCount} suggested questions about the Conscientiology corpus following strictly these guidelines:\n\n` +
-          `- For each item return the topic ('topic') and the question ('question').\n` +
-          `- Each question must address a completely different topic or concept from the other questions in this batch.\n` +
-          `- Freely choose new topics and technical terms of Conscientiology, widely varying the topics in each generation.\n` +
-          `- Do not repeat topics covered in previous rounds.\n` +
-          `- Generate questions with at most 10 words each.\n` +
-          `- Write in British English, in a clear, natural manner, ending with a question mark.\n` +
-          `- Do not ask overly narrow questions or questions that can be answered with yes or no.\n` +
-          `- Prefer using Conscientiological terms and vocabulary.\n` +
-          previousThemesContext
+        `- For each item return the topic ('topic') and the question ('question').\n` +
+        `- Each question must address a completely different topic or concept from the other questions in this batch.\n` +
+        `- Freely choose new topics and technical terms of Conscientiology, widely varying the topics in each generation.\n` +
+        `- Do not repeat topics covered in previous rounds.\n` +
+        `- Generate questions with at most 10 words each.\n` +
+        `- Write in British English, in a clear, natural manner, ending with a question mark.\n` +
+        `- Do not ask overly narrow questions or questions that can be answered with yes or no.\n` +
+        `- Prefer using Conscientiological terms and vocabulary.\n` +
+        previousThemesContext
         : `Gere exatamente ${expectedCount} perguntas de sugestão sobre o corpus da Conscienciologia seguindo estritamente estas diretrizes:\n\n` +
-          `- Para cada item retorne a temática ('topic') e a pergunta ('question').\n` +
-          `- Cada pergunta deve abordar uma temática ou conceito totalmente diferente das outras perguntas deste lote.\n` +
-          `- Escolha livremente novas temáticas e termos técnicos da Conscienciologia, variando amplamente os tópicos a cada geração.\n` +
-          `- Não repita temáticas abordadas em rodadas anteriores.\n` +
-          `- Gere perguntas com no máximo 10 palavras cada uma.\n` +
-          `- Escreva em português do Brasil, de forma clara, natural e terminando com ponto de interrogação.\n` +
-          `- Não faça perguntas muito fechadas ou que possam ser respondidas com sim ou não.\n` +
-          `- Prefira usar termos e jargões conscienciológicos.\n` +
-          previousThemesContext;
+        `- Para cada item retorne a temática ('topic') e a pergunta ('question').\n` +
+        `- Cada pergunta deve abordar uma temática ou conceito totalmente diferente das outras perguntas deste lote.\n` +
+        `- Escolha livremente novas temáticas e termos técnicos da Conscienciologia, variando amplamente os tópicos a cada geração.\n` +
+        `- Não repita temáticas abordadas em rodadas anteriores.\n` +
+        `- Gere perguntas com no máximo 10 palavras cada uma.\n` +
+        `- Escreva em português do Brasil, de forma clara, natural e terminando com ponto de interrogação.\n` +
+        `- Não faça perguntas muito fechadas ou que possam ser respondidas com sim ou não.\n` +
+        `- Prefira usar termos e jargões conscienciológicos.\n` +
+        previousThemesContext;
 
       const schemaDescription = isEnglish
         ? `An object with exactly ${expectedCount} suggestions containing topic ('topic') and question ('question') on Conscientiology, with varied themes and short questions (max 10 words) in British English.`
@@ -676,9 +675,9 @@ export function ChatWindow({
         if (!response.ok) {
           throw new Error(
             result.detail ||
-              (isEnglish
-                ? "Unable to generate new questions."
-                : "Não foi possível gerar novas perguntas."),
+            (isEnglish
+              ? "Unable to generate new questions."
+              : "Não foi possível gerar novas perguntas."),
           );
         }
         const parsed = result.content ? (JSON.parse(result.content) as SuggestionsPayload) : {};
@@ -835,7 +834,7 @@ export function ChatWindow({
             <div className="flex flex-col items-center gap-3 pt-0 sm:gap-6 sm:pt-4">
               <div className="flex flex-col items-center gap-2 text-center">
                 {/* 22px no mobile e 40px no desktop */}
-                <h2 className="font-display text-[22px] font-normal leading-[1.05] text-foreground sm:text-[40px]">
+                <h2 className="font-display text-[24px] font-normal leading-[1.2] text-foreground sm:text-[42px]">
                   {isEnglishVectorStore(settings.vectorStoreId) ? (
                     <>
                       Artificial Intelligence
@@ -899,11 +898,11 @@ export function ChatWindow({
             const ragStatus =
               message.role === "user"
                 ? getRagStatus(
-                    message,
-                    messages[messageIndex + 1],
-                    settings.vectorStoreId,
-                    sourceCounts,
-                  )
+                  message,
+                  messages[messageIndex + 1],
+                  settings.vectorStoreId,
+                  sourceCounts,
+                )
                 : null;
             return (
               <div key={message.id} className="w-full">
@@ -930,7 +929,7 @@ export function ChatWindow({
                       if (part.type === "text") {
                         const text =
                           message.role === "assistant" &&
-                          settings.responseFormat === "conscienciological"
+                            settings.responseFormat === "conscienciological"
                             ? normalizeConscienciologicalLists(part.text)
                             : part.text;
 
