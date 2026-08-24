@@ -15,7 +15,7 @@
  *
  *  Apesar do nome, não é um "modo agente" no sentido de tool calling — a LLM
  *  não decide nem executa ferramenta alguma. É detecção de intenção por regra
- *  determinística no cliente, com sugestão de ação. Ver README do módulo.
+ *  determinística no cliente, com sugestão de ação. Ver README do módulo.     
  *
  *  DESLIGADO (0), o módulo é inerte: <AgentActions /> devolve null e nenhuma
  *  regra é avaliada.
