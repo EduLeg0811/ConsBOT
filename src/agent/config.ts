@@ -36,7 +36,7 @@
  */
 // Anotado como `number` de propósito: sem isso o TS trava o literal e acusa a
 // comparação `=== 1` como impossível quando o valor mudar.
-const AGENT_MODE_DEFAULT: number;
+const AGENT_MODE_DEFAULT: number = 0;
 
 const agentModeOverride = String(import.meta.env.VITE_AGENT_MODE ?? "").trim();
 
