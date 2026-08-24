@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, Search } from "lucide-react";
+import { ExternalLink, RefreshCw, Search } from "lucide-react";
 
 import { AgentCard } from "@/agent/ui/AgentCard";
 import { planAgent } from "@/agent/planner/plan";
@@ -34,6 +34,13 @@ function lastMessageOf(messages: AgentMessage[], role: "user" | "assistant") {
   return null;
 }
 
+function indexOfLastUser(messages: AgentMessage[]): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") return index;
+  }
+  return messages.length;
+}
+
 type CardState = { loading: boolean; error: string | null; card: AgentCardData | null };
 
 type Props = {
@@ -41,6 +48,8 @@ type Props = {
   settings: AgentSettings;
   host: AgentHost;
   messages: AgentMessage[];
+  fullAnswerQuestion?: string;
+  onFullAnswer?: (question: string) => void;
 };
 
 /** Botões opcionais de ação sugerida (módulo AGENT).
@@ -49,9 +58,19 @@ type Props = {
  * é por isso que o ChatWindow pode montar este componente incondicionalmente,
  * sem `if`. O padrão de `agentMode` vem de AGENT_MODE (ver agent/config.ts).
  */
-export function AgentActions({ threadId, settings, host, messages }: Props) {
+export function AgentActions({
+  threadId,
+  settings,
+  host,
+  messages,
+  fullAnswerQuestion,
+  onFullAnswer,
+}: Props) {
   const user = lastMessageOf(messages, "user");
-  const assistant = lastMessageOf(messages, "assistant");
+  // A resposta anterior À PERGUNTA ATUAL, não a última da thread: depois de
+  // uma resposta curta da triagem, a última seria a desta mesma pergunta, e o
+  // plano seria recalculado com outra chave de cache — uma chamada a mais.
+  const assistant = lastMessageOf(messages.slice(0, indexOfLastUser(messages)), "assistant");
   const enabled = settings.enabled;
   const detection = settings.detection;
   // O botão abre o card em vez de outra aba nos dois modos que consultam a
@@ -160,11 +179,22 @@ export function AgentActions({ threadId, settings, host, messages }: Props) {
 
   const actions = detection === "llm" ? llmActions : ruleActions;
 
-  if (!enabled || actions.length === 0) return null;
+  if (!enabled || (actions.length === 0 && !fullAnswerQuestion)) return null;
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
+        {fullAnswerQuestion && onFullAnswer ? (
+          <button
+            type="button"
+            onClick={() => onFullAnswer(fullAnswerQuestion)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-chat text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+          >
+            <RefreshCw className="size-3.5 shrink-0" aria-hidden="true" />
+            <span>{english ? "Full answer" : "Resposta completa"}</span>
+          </button>
+        ) : null}
+
         {actions.map((action) =>
           cardMode ? (
             <button
@@ -175,7 +205,7 @@ export function AgentActions({ threadId, settings, host, messages }: Props) {
               }
               disabled={cards[action.id]?.loading}
               onClick={() => runSearch(action)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-chat text-foreground transition-colors hover:border-chart-2/50 hover:bg-chart-2/10 hover:text-chart-2 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-full border border-chart-2/40 bg-chart-2/10 px-3 py-1.5 text-xs font-chat text-foreground transition-colors hover:border-chart-2/60 hover:bg-chart-2/20 disabled:opacity-50"
             >
               <Search className="size-3.5 shrink-0" aria-hidden="true" />
               <span>{action.label}</span>
@@ -190,7 +220,7 @@ export function AgentActions({ threadId, settings, host, messages }: Props) {
               onClick={() =>
                 host.logEvent({ intent: action.id, via: "link", detection, meta: action.meta })
               }
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-chat text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+              className="inline-flex items-center gap-1.5 rounded-full border border-chart-2/40 bg-chart-2/10 px-3 py-1.5 text-xs font-chat text-foreground transition-colors hover:border-chart-2/60 hover:bg-chart-2/20"
             >
               <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
               <span>{action.label}</span>

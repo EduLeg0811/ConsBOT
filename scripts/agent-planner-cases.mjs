@@ -158,6 +158,7 @@ export const CASES = [
   { ficha: "geral", q: "Como identifico meu curso intermissivo?", expect: [] },
   { ficha: "geral", q: "Você pode me ajudar a entender a proéxis?", expect: [] },
   { ficha: "geral", q: "Faça um resumo do que conversamos até aqui.", expect: [] },
-  { ficha: "geral", q: "Boa noite! Tudo bem com você?", expect: [] },
+  // Único caso sem ação em que responder direto é o certo: não pede conteúdo.
+  { ficha: "geral", q: "Boa noite! Tudo bem com você?", expect: [], mode: "direct" },
   { ficha: "geral", q: "Escreva um parágrafo sobre autoconhecimento evolutivo.", expect: [] },
 ];

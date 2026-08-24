@@ -412,6 +412,7 @@ export function ThreadPage() {
           onMessagesChange={handleMessagesChange}
           onAuditStart={handleAuditStart}
           onAuditComplete={handleAuditComplete}
+          isAdmin={isAdmin}
         />
       </div>
       <Toaster />

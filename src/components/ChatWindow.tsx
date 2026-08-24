@@ -28,7 +28,7 @@ import {
 } from "@/lib/chat-settings";
 import { API_BASE } from "@/lib/main-server";
 import { logFeatureAccess } from "@/lib/access-log";
-import { AgentActions, AgentStatus, prepareAgentContext, type AgentHost } from "@/agent";
+import { AgentActions, AgentStatus, triageAgent, type AgentHost } from "@/agent";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type {
   AuditCompletion,
@@ -182,6 +182,43 @@ function normalizeConscienciologicalLists(text: string) {
   return result;
 }
 
+/** Texto da última resposta do assistente, se houver. A triagem usa isso para
+ * saber que a conversa já começou — e recusar responder sozinha o que dependa
+ * do histórico, que ela não recebe. */
+function lastAssistantText(messages: ConsBotUIMessage[]): string | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.role !== "assistant") continue;
+
+    const text = message.parts
+      .filter((part) => part.type === "text")
+      .map((part) => (part.type === "text" ? part.text : ""))
+      .join(" ")
+      .trim();
+
+    if (text) return text;
+  }
+
+  return undefined;
+}
+
+function newMessageId(): string {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `m-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+}
+
+/** A pergunta guardada numa resposta curta da triagem, quando é uma. */
+function directQuestion(message: ConsBotUIMessage): string {
+  const meta = message.metadata;
+  return meta &&
+    typeof meta === "object" &&
+    "agentDirect" in meta &&
+    typeof meta.agentDirect === "string"
+    ? meta.agentDirect
+    : "";
+}
+
 type Props = {
   threadId: string;
   settings: ChatSettings;
@@ -190,6 +227,7 @@ type Props = {
   onMessagesChange: (messages: ConsBotUIMessage[]) => void;
   onAuditStart: (request: unknown) => string;
   onAuditComplete: (id: string, result: AuditCompletion, status?: AuditLog["status"]) => void;
+  isAdmin?: boolean;
 };
 
 type VectorStoreSummaryResponse = {
@@ -205,6 +243,7 @@ export function ChatWindow({
   onMessagesChange,
   onAuditStart,
   onAuditComplete,
+  isAdmin = false,
 }: Props) {
   const isMobile = useIsMobile();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -409,7 +448,7 @@ export function ChatWindow({
   }, [isBusy, messages, onAuditComplete]);
 
   const submit = useCallback(
-    async (text: string) => {
+    async (text: string, forceFull = false) => {
       const value = text.trim();
       if (!value || isBusy) return;
       openaiAuditRef.current = null;
@@ -456,24 +495,79 @@ export function ChatWindow({
       setInput("");
       setHasTyped(true);
 
-      // Único ponto em que o agente atrasa alguma coisa: no modo «Alimentar
-      // resposta» ele planeja e consulta ANTES de a resposta começar. Nos
-      // demais modos devolve string vazia de imediato.
-      agentContextRef.current = await prepareAgentContext({
-        userText: value,
-        settings: settingsRef.current.agent,
-        host: agentHost,
-        threadId,
-      });
+      // O eco da pergunta entra ANTES da triagem. Ele não depende de LLM
+      // nenhuma, e esperar a triagem para exibi-lo deixava a tela parada por
+      // um segundo depois do envio — como se nada tivesse acontecido.
+      const echoId = newMessageId();
+      const historico = lastAssistantText(messages);
+      setMessages((current) => [
+        ...current,
+        { id: echoId, role: "user", parts: [{ type: "text", text: value }] },
+      ]);
+
+      // Triagem: o único ponto em que o módulo interfere no fluxo. Com o Modo
+      // Agente desligado devolve bypass sem tocar em rede, e daqui para baixo
+      // tudo se comporta como antes dele existir.
+      const triage = forceFull
+        ? { mode: "full" as const, answer: "", context: "" }
+        : await triageAgent({
+            userText: value,
+            assistantText: historico,
+            settings: settingsRef.current.agent,
+            host: agentHost,
+            threadId,
+          });
+
+      // A triagem resolveu sozinha: a resposta é curta e a busca vem nos pills.
+      // Não há chamada ao modelo completo, então a resposta é inserida aqui —
+      // com a pergunta guardada, para o botão «Resposta completa» refazê-la.
+      if (triage.mode === "direct") {
+        setMessages((current) => [
+          ...current,
+          {
+            id: newMessageId(),
+            role: "assistant",
+            parts: [{ type: "text", text: triage.answer }],
+            metadata: { agentDirect: value },
+          },
+        ]);
+        return;
+      }
+
+      agentContextRef.current = triage.context;
+
+      // O caminho completo passa pelo transporte, que insere a mensagem do
+      // usuário por conta própria — o eco provisório sai para não duplicar.
+      //
+      // A troca deixa uma lacuna de um quadro (~28 ms medidos): o sendMessage
+      // insere a dele depois de um await interno, então as duas atualizações
+      // não caem no mesmo lote. Some se um dia o SDK aceitar reaproveitar o
+      // id do eco; até lá, um quadro é melhor que a pergunta duplicada.
+      setMessages((current) => current.filter((message) => message.id !== echoId));
 
       void sendMessage({
         text: value,
         metadata: { ragVectorStoreId: settingsRef.current.vectorStoreId },
       });
     },
-    [agentHost, isBusy, messages, onAuditStart, sendMessage, threadId],
+    [agentHost, isBusy, messages, onAuditStart, sendMessage, setMessages, threadId],
   );
 
+  // Refaz a pergunta pelo caminho completo. Descarta o par que a triagem
+  // criou — pergunta e resposta curta — para a conversa não ficar com a mesma
+  // pergunta duas vezes; o sendMessage recria a mensagem do usuário.
+  const askFullAnswer = useCallback(
+    (question: string) => {
+      setMessages((current) => {
+        const trimmed = [...current];
+        if (trimmed.at(-1)?.role === "assistant") trimmed.pop();
+        if (trimmed.at(-1)?.role === "user") trimmed.pop();
+        return trimmed;
+      });
+      void submit(question, true);
+    },
+    [setMessages, submit],
+  );
   useEffect(() => {
     const query =
       searchParams.get("question") ||
@@ -864,7 +958,9 @@ export function ChatWindow({
                     <span>{ragStatus}</span>
                   </div>
                 ) : null}
-                {message.role === "user" ? <AgentStatus settings={settings.agent} /> : null}
+                {message.role === "user" ? (
+                  <AgentStatus settings={settings.agent} isAdmin={isAdmin} />
+                ) : null}
               </div>
             );
           })}
@@ -914,6 +1010,10 @@ export function ChatWindow({
             settings={settings.agent}
             host={agentHost}
             messages={messages}
+            fullAnswerQuestion={
+              messages.at(-1)?.role === "assistant" ? directQuestion(messages.at(-1)!) : ""
+            }
+            onFullAnswer={askFullAnswer}
           />
         </ConversationContent>
         <ConversationScrollButton />

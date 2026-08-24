@@ -36,7 +36,7 @@
  */
 // Anotado como `number` de propósito: sem isso o TS trava o literal e acusa a
 // comparação `=== 1` como impossível quando o valor mudar.
-const AGENT_MODE_DEFAULT: number = 0;
+const AGENT_MODE_DEFAULT: number;
 
 const agentModeOverride = String(import.meta.env.VITE_AGENT_MODE ?? "").trim();
 
@@ -143,12 +143,11 @@ export const AGENT_CLASSIFIER_REASONING = { id: "none", label: "None" } as const
 
 /** No modo Classificador LLM, o que o botão faz.
  *
- * `link` — abre o módulo externo em nova aba, levando o termo na URL. Foi o
- *          comportamento original; hoje é a alternativa.
- * `api`  — PADRÃO. Consulta o endpoint correspondente do Main-Server e mostra
- *          o resultado num card dentro da própria conversa, com um link
- *          discreto para o módulo completo. A consulta só acontece no clique,
- *          então o custo continua sendo do usuário que pede.
+ * `link` — PADRÃO. Abre o módulo externo em nova aba, levando o termo na URL.
+ *          Não consulta nada: o custo é zero e o usuário decide para onde vai.
+ * `api`  — Consulta o endpoint correspondente do Main-Server e mostra o
+ *          resultado num card dentro da própria conversa, com um link discreto
+ *          para o módulo completo. A consulta só acontece no clique.
  *
  * Vale apenas para a detecção `llm`; em `rules` o botão é sempre link. */
 export const AGENT_LLM_MODES = [
@@ -171,11 +170,30 @@ export const AGENT_LLM_MODES = [
 
 export type AgentLlmModeId = (typeof AGENT_LLM_MODES)[number]["id"];
 
-export const AGENT_LLM_MODE_DEFAULT: AgentLlmModeId = "api";
+export const AGENT_LLM_MODE_DEFAULT: AgentLlmModeId = "link";
 
 /** Quantos resultados pedir ao Main-Server e quantos mostrar antes do
  * «ver mais». Buscar mais do que se mostra é o que permite expandir sem uma
  * segunda ida à rede. */
+/** Quem responde a mensagem — a decisão de porteiro da triagem.
+ *
+ * `direct`: a própria triagem responde, em `answer`. Só vale quando a
+ *           resposta não depende do corpus: saudação, meta-pergunta, ou
+ *           pedido de busca — nesse caso a busca É a resposta, e `answer` é
+ *           só a frase de contexto que acompanha o pill.
+ * `full`:   o modelo completo responde, com acesso às fontes. É o padrão e
+ *           o destino de tudo que precise ser escrito ou consultado.
+ *
+ * O viés é deliberadamente conservador: gastar uma chamada à toa é barato,
+ * engolir uma pergunta que merecia resposta é caro. */
+export const AGENT_ANSWER_MODES = ["direct", "full"] as const;
+
+export type AgentAnswerMode = (typeof AGENT_ANSWER_MODES)[number];
+
+/** Teto da frase que acompanha o pill. Duas frases, não um parágrafo: quem
+ * pediu busca quer a busca, não texto. */
+export const AGENT_ANSWER_MAX = 320;
+
 /** Como o planejador quer que o resultado chegue ao usuário. Só é consultado
  * no modo «Alimentar resposta»; nos outros dois quem decide é o modo. */
 export const AGENT_DELIVERIES = ["card", "context", "both"] as const;

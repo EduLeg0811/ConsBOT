@@ -24,7 +24,7 @@ export function AgentCard({ action, card, loading, error, english, onOpenExterna
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-border bg-card/70 px-3 py-2.5 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-xs text-muted-foreground">
         <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden="true" />
         <span>{english ? "Searching…" : "Buscando…"}</span>
       </div>
@@ -33,7 +33,7 @@ export function AgentCard({ action, card, loading, error, english, onOpenExterna
 
   if (error) {
     return (
-      <div className="rounded-xl border border-border bg-card/70 px-3 py-2.5 text-xs text-muted-foreground">
+      <div className="rounded-xl border border-border bg-card px-3 py-2.5 text-xs text-muted-foreground">
         <p>{error}</p>
         <button
           type="button"
@@ -53,7 +53,7 @@ export function AgentCard({ action, card, loading, error, english, onOpenExterna
   const hidden = card.items.length - visible.length;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-chart-2/40 bg-chart-2/5">
+    <div className="overflow-hidden rounded-xl border border-chart-2/40 bg-card">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-chart-2/25 px-3 py-2">
         <span className="text-xs font-medium text-foreground">{action.label}</span>
         <span className="text-[11px] text-muted-foreground">
@@ -78,7 +78,7 @@ export function AgentCard({ action, card, loading, error, english, onOpenExterna
                   em itálico). Renderizar como markdown preserva a ênfase que o
                   autor deu; sem isso, ou os asteriscos apareciam na tela, ou a
                   ênfase se perdia ao ser removida. */}
-              <Streamdown className="agent-card-snippet mt-0.5 text-xs leading-relaxed text-foreground/85 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>p]:m-0 [&_[data-streamdown='strong']]:font-semibold [&_strong]:font-semibold">
+              <Streamdown className="agent-card-snippet mt-0.5 text-xs leading-relaxed text-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&>p]:m-0 [&_[data-streamdown='strong']]:font-bold [&_[data-streamdown='strong']]:text-foreground [&_strong]:font-bold [&_b]:font-bold">
                 {item.snippet}
               </Streamdown>
             </li>

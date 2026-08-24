@@ -8,6 +8,10 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   plugins: [tsconfigPaths(), tailwindcss(), react()],
   server: {
-    port: 5173,
+    // 5173 continua sendo o padrão local. `PORT` existe porque o Vite não lê
+    // essa variável sozinho, e sem isso quem inicia o servidor de fora — o
+    // painel de preview, um script — não consegue escolher outra porta quando
+    // a 5173 já está ocupada por uma instância anterior.
+    port: Number(process.env.PORT) || 5173,
   },
 });

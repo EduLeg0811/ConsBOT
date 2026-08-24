@@ -1,8 +1,13 @@
-import type { AgentDelivery, AgentIntentId, AgentVerbeteField } from "@/agent/config";
+import type {
+  AgentAnswerMode,
+  AgentDelivery,
+  AgentIntentId,
+  AgentVerbeteField,
+} from "@/agent/config";
 import type { AgentHost } from "@/agent/host";
 import type { AgentSettings } from "@/agent/settings";
 
-export type { AgentDelivery, AgentIntentId, AgentVerbeteField };
+export type { AgentAnswerMode, AgentDelivery, AgentIntentId, AgentVerbeteField };
 
 /** Tipos de ação que o módulo sabe oferecer.
  *
@@ -116,4 +121,8 @@ export type AgentTool = {
 export type AgentPlan = {
   actions: AgentAction[];
   delivery: AgentDelivery;
+  /** Quem responde: a própria triagem ou o modelo completo. */
+  answerMode: AgentAnswerMode;
+  /** A resposta curta, quando `answerMode` é `direct`. Vazia em `full`. */
+  answer: string;
 };

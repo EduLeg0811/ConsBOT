@@ -1,4 +1,4 @@
-import { AGENT_DELIVERIES } from "@/agent/config";
+import { AGENT_ANSWER_MODES, AGENT_DELIVERIES } from "@/agent/config";
 import { AGENT_TOOLS } from "@/agent/tools/registry";
 
 /** JSON Schema do planejador, gerado do registro.
@@ -52,8 +52,19 @@ function buildSchema() {
         description:
           "Como entregar: card (botão ao lado da resposta), context (o resultado alimenta a resposta) ou both.",
       },
+      answer_mode: {
+        type: "string",
+        enum: [...AGENT_ANSWER_MODES],
+        description:
+          "Quem responde: direct (você responde em answer) ou full (o modelo completo responde, com acesso às fontes).",
+      },
+      answer: {
+        type: "string",
+        description:
+          "A resposta, quando answer_mode for direct. No máximo duas frases. String vazia quando for full.",
+      },
     },
-    required: ["actions", "delivery"],
+    required: ["actions", "delivery", "answer_mode", "answer"],
     additionalProperties: false,
   };
 }

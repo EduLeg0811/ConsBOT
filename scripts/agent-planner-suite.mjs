@@ -105,6 +105,8 @@ async function classify(instructions, schema, question) {
   return {
     intents: actions.map((a) => a.intent).filter(Boolean),
     delivery: parsed.delivery ?? "—",
+    mode: parsed.answer_mode ?? "—",
+    answer: parsed.answer ?? "",
     args: actions.map((a) => ({ term: a.term, field: a.field || "", book: a.book || "" })),
   };
 }
@@ -160,7 +162,9 @@ async function main() {
     }
 
     const hits = runs.filter((run) => same(run.intents, testCase.expect)).length;
-    return { testCase, runs, hits };
+    const wanted = testCase.mode ?? (testCase.expect.length > 0 ? "direct" : "full");
+    const modeHits = runs.filter((run) => run.mode === wanted).length;
+    return { testCase, runs, hits, wanted, modeHits };
   });
 
   const elapsed = ((Date.now() - started) / 1000).toFixed(0);
@@ -177,6 +181,7 @@ async function main() {
     const status = hits === RUNS ? "PASS" : hits === 0 ? "FAIL" : "VARIA";
     const observed = runs[0].intents.join("+") || "—";
     const deliveries = [...new Set(runs.map((r) => r.delivery))].join("/");
+    const modes = [...new Set(runs.map((r) => r.mode))].join("/");
     const flags = [];
 
     // Parâmetro esperado que não veio é falha silenciosa: o botão aparece,
@@ -194,7 +199,7 @@ async function main() {
     }
 
     console.log(
-      `${status.padEnd(6)}${`${hits}/${RUNS}`.padEnd(5)}${observed.padEnd(34)}${deliveries.padEnd(14)}${flags.join(" ")}  ${testCase.q}`,
+      `${status.padEnd(6)}${`${hits}/${RUNS}`.padEnd(5)}${observed.padEnd(30)}${modes.padEnd(13)}${deliveries.padEnd(13)}${flags.join(" ")}  ${testCase.q}`,
     );
 
     if (status !== "PASS")
@@ -216,6 +221,21 @@ async function main() {
     const label = ficha === "geral" ? "geral" : `ficha ${ficha}`;
     console.log(`  ${String(label).padEnd(10)} ${ok}/${group.length}  ${pct(ok, group.length)}`);
   }
+
+  /* ── porteiro: quem responde a mensagem ───────────────────────────────────
+   * Dois erros, de gravidade oposta. ENGOLIDA é a triagem responder sozinha
+   * uma pergunta que precisava das fontes — resposta errada ao usuário, e o
+   * erro que precisa ser zero. DESPERDÍCIO é mandar ao modelo completo algo
+   * que o pill já resolvia: custa uma chamada, e nada mais. */
+  const engolidas = rows.filter((r) => r.wanted === "full" && r.modeHits < RUNS);
+  const desperdicio = rows.filter((r) => r.wanted === "direct" && r.modeHits < RUNS);
+  const modoOk = rows.filter((r) => r.modeHits === RUNS).length;
+
+  console.log(`\nPorteiro: ${modoOk}/${rows.length} estáveis no answer_mode esperado`);
+  console.log(`  engolidas (direct onde precisava de fonte): ${engolidas.length}`);
+  for (const row of engolidas) console.log(`     ${row.testCase.q}`);
+  console.log(`  desperdício (full onde o pill bastava): ${desperdicio.length}`);
+  for (const row of desperdicio) console.log(`     ${row.testCase.q}`);
 
   /* ── risco de latência: com que frequência o planejador pede `context` ──
    * Só importa no modo «Alimentar resposta», onde `context` significa buscar
