@@ -201,6 +201,20 @@ function lastAssistantText(messages: ConsBotUIMessage[]): string | undefined {
   return undefined;
 }
 
+function getMessageText(message: ConsBotUIMessage): string {
+  return message.parts
+    .filter((part) => part.type === "text")
+    .map((part) => (part as { text: string }).text)
+    .join("\n")
+    .trim();
+}
+
+function getFirstLines(text: string, maxLines = 10): string {
+  const lines = text.split("\n");
+  if (lines.length <= maxLines) return text.trim();
+  return lines.slice(0, maxLines).join("\n").trim();
+}
+
 function newMessageId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -217,6 +231,14 @@ function directQuestion(message: ConsBotUIMessage): string {
     ? meta.agentDirect
     : "";
 }
+
+type PendingAccessLog = {
+  action: string;
+  label: string;
+  value: string;
+  chat_id: string;
+  meta: Record<string, unknown>;
+};
 
 type Props = {
   threadId: string;
@@ -264,6 +286,7 @@ export function ChatWindow({
   const [sourceCounts, setSourceCounts] = useState<Record<string, number>>({});
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingAuditId = useRef<string | null>(null);
+  const pendingAccessLogRef = useRef<PendingAccessLog | null>(null);
   const openaiAuditRef = useRef<OpenAIAuditEvent | null>(null);
   const auditCompleteRef = useRef(onAuditComplete);
   const initialUrlQuestionProcessedRef = useRef(false);
@@ -379,6 +402,20 @@ export function ChatWindow({
         if (part.type === "data-llmMeta") openaiAuditRef.current = part.data;
       },
       onError: (error) => {
+        if (pendingAccessLogRef.current) {
+          logFeatureAccess({
+            module: "consbot",
+            action: pendingAccessLogRef.current.action,
+            label: pendingAccessLogRef.current.label,
+            value: pendingAccessLogRef.current.value,
+            chat_id: pendingAccessLogRef.current.chat_id,
+            meta: {
+              ...pendingAccessLogRef.current.meta,
+              response: `[Erro: ${error.message || "Não foi possível responder"}]`,
+            },
+          });
+          pendingAccessLogRef.current = null;
+        }
         if (pendingAuditId.current) {
           auditCompleteRef.current(
             pendingAuditId.current,
@@ -421,29 +458,50 @@ export function ChatWindow({
   }, [isBusy, isMobile, threadId, input]);
 
   useEffect(() => {
-    if (isBusy || !pendingAuditId.current) return;
+    if (isBusy || (!pendingAuditId.current && !pendingAccessLogRef.current)) return;
     const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
-    if (lastAssistant) {
-      onAuditComplete(pendingAuditId.current, {
-        openaiRequest: openaiAuditRef.current?.request,
-        response: openaiAuditRef.current
-          ? {
-            responseId: openaiAuditRef.current.responseId,
-            model: openaiAuditRef.current.model,
-            finishReason: openaiAuditRef.current.finishReason,
-            usage: openaiAuditRef.current.usage,
-          }
-          : { aviso: "O stream terminou sem metadados de auditoria da OpenAI." },
-        uiResponse: lastAssistant,
+    const assistantText = lastAssistant ? getMessageText(lastAssistant) : "";
+    const first10Lines = assistantText ? getFirstLines(assistantText, 10) : undefined;
+
+    if (pendingAccessLogRef.current) {
+      logFeatureAccess({
+        module: "consbot",
+        action: pendingAccessLogRef.current.action,
+        label: pendingAccessLogRef.current.label,
+        value: pendingAccessLogRef.current.value,
+        chat_id: pendingAccessLogRef.current.chat_id,
+        meta: {
+          ...pendingAccessLogRef.current.meta,
+          ...(first10Lines ? { response: first10Lines } : {}),
+        },
       });
-    } else
-      onAuditComplete(
-        pendingAuditId.current,
-        { response: { error: "A chamada foi finalizada sem uma resposta da LLM." } },
-        "error",
-      );
-    pendingAuditId.current = null;
-    openaiAuditRef.current = null;
+      pendingAccessLogRef.current = null;
+    }
+
+    if (pendingAuditId.current) {
+      if (lastAssistant) {
+        onAuditComplete(pendingAuditId.current, {
+          openaiRequest: openaiAuditRef.current?.request,
+          response: openaiAuditRef.current
+            ? {
+              responseId: openaiAuditRef.current.responseId,
+              model: openaiAuditRef.current.model,
+              finishReason: openaiAuditRef.current.finishReason,
+              usage: openaiAuditRef.current.usage,
+            }
+            : { aviso: "O stream terminou sem metadados de auditoria da OpenAI." },
+          uiResponse: lastAssistant,
+        });
+      } else {
+        onAuditComplete(
+          pendingAuditId.current,
+          { response: { error: "A chamada foi finalizada sem uma resposta da LLM." } },
+          "error",
+        );
+      }
+      pendingAuditId.current = null;
+      openaiAuditRef.current = null;
+    }
   }, [isBusy, messages, onAuditComplete]);
 
   const submit = useCallback(
@@ -469,27 +527,19 @@ export function ChatWindow({
       });
       const current = settingsRef.current;
       const store = VECTOR_STORES.find((item) => item.id === current.vectorStoreId);
-      logFeatureAccess({
-        module: "consbot",
-        action: "ask",
-        label: "Pergunta ao ConsBOT",
-        // `value` é a pergunta digitada; o painel a exibe como consulta do usuário.
-        value,
-        chat_id: threadId,
-        meta: {
-          model: MODELS.find((item) => item.id === current.model)?.label ?? current.model,
-          // O rótulo da base diz mais que o `vs_…` no painel; "Nenhuma" quando sem RAG.
-          vector_store: store?.label ?? current.vectorStoreId,
-          // O systemPrompt tem milhares de caracteres e é derivado do formato,
-          // então registra-se o formato, que o identifica sem inflar o log.
-          response_format: current.responseFormat,
-          reasoning_effort: current.reasoningEffort,
-          verbosity: current.textVerbosity,
-          ...(vectorStoresFor(current.vectorStoreId).length > 0
-            ? { vector_max_results: current.vectorMaxResults }
-            : {}),
-        },
-      });
+      const telemetryMeta = {
+        model: MODELS.find((item) => item.id === current.model)?.label ?? current.model,
+        // O rótulo da base diz mais que o `vs_…` no painel; "Nenhuma" quando sem RAG.
+        vector_store: store?.label ?? current.vectorStoreId,
+        // O systemPrompt tem milhares de caracteres e é derivado do formato,
+        // então registra-se o formato, que o identifica sem inflar o log.
+        response_format: current.responseFormat,
+        reasoning_effort: current.reasoningEffort,
+        verbosity: current.textVerbosity,
+        ...(vectorStoresFor(current.vectorStoreId).length > 0
+          ? { vector_max_results: current.vectorMaxResults }
+          : {}),
+      };
 
       setInput("");
       setHasTyped(true);
@@ -523,6 +573,17 @@ export function ChatWindow({
       // No padrão ("auto"), a chamada ao modelo completo segue diretamente.
       const allowDirect = settingsRef.current.agent.fullAnswer === "pill";
       if (!forceFull && allowDirect && triage.mode === "direct") {
+        logFeatureAccess({
+          module: "consbot",
+          action: "ask",
+          label: "Pergunta ao ConsBOT",
+          value,
+          chat_id: threadId,
+          meta: {
+            ...telemetryMeta,
+            response: getFirstLines(triage.answer, 10),
+          },
+        });
         setMessages((current) => [
           ...current,
           {
@@ -534,6 +595,14 @@ export function ChatWindow({
         ]);
         return;
       }
+
+      pendingAccessLogRef.current = {
+        action: "ask",
+        label: "Pergunta ao ConsBOT",
+        value,
+        chat_id: threadId,
+        meta: telemetryMeta,
+      };
 
       agentContextRef.current = triage.context;
 
@@ -756,6 +825,26 @@ export function ChatWindow({
 
   const regenerateWithAudit = () => {
     if (isBusy) return;
+    const current = settingsRef.current;
+    const store = VECTOR_STORES.find((item) => item.id === current.vectorStoreId);
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    const userText = lastUser ? getMessageText(lastUser) : "";
+    pendingAccessLogRef.current = {
+      action: "regenerate",
+      label: "Regeneração de resposta",
+      value: userText,
+      chat_id: threadId,
+      meta: {
+        model: MODELS.find((item) => item.id === current.model)?.label ?? current.model,
+        vector_store: store?.label ?? current.vectorStoreId,
+        response_format: current.responseFormat,
+        reasoning_effort: current.reasoningEffort,
+        verbosity: current.textVerbosity,
+        ...(vectorStoresFor(current.vectorStoreId).length > 0
+          ? { vector_max_results: current.vectorMaxResults }
+          : {}),
+      },
+    };
     openaiAuditRef.current = null;
     pendingAuditId.current = onAuditStart({
       endpoint: `${API_BASE}/api/llm`,
@@ -778,6 +867,25 @@ export function ChatWindow({
   };
 
   const stopWithAudit = () => {
+    if (pendingAccessLogRef.current) {
+      const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
+      const assistantText = lastAssistant ? getMessageText(lastAssistant) : "";
+      const first10Lines = assistantText
+        ? getFirstLines(assistantText, 10)
+        : "[Resposta interrompida pelo usuário]";
+      logFeatureAccess({
+        module: "consbot",
+        action: pendingAccessLogRef.current.action,
+        label: pendingAccessLogRef.current.label,
+        value: pendingAccessLogRef.current.value,
+        chat_id: pendingAccessLogRef.current.chat_id,
+        meta: {
+          ...pendingAccessLogRef.current.meta,
+          response: first10Lines,
+        },
+      });
+      pendingAccessLogRef.current = null;
+    }
     if (pendingAuditId.current) {
       onAuditComplete(
         pendingAuditId.current,
