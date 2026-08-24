@@ -519,9 +519,11 @@ export function ChatWindow({
           });
 
       // A triagem resolveu sozinha: a resposta é curta e a busca vem nos pills.
-      // Não há chamada ao modelo completo, então a resposta é inserida aqui —
-      // com a pergunta guardada, para o botão «Resposta completa» refazê-la.
-      if (triage.mode === "direct") {
+      // Só intercepta para exibir a resposta curta e o pill «Resposta completa»
+      // se a opção fullAnswer estiver configurada como "pill".
+      // No padrão ("auto"), a chamada ao modelo completo segue diretamente.
+      const allowDirect = settingsRef.current.agent.fullAnswer === "pill";
+      if (!forceFull && allowDirect && triage.mode === "direct") {
         setMessages((current) => [
           ...current,
           {

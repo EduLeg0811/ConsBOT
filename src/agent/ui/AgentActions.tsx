@@ -99,8 +99,16 @@ export function AgentActions({
     [enabled, detection, user?.text, host.english],
   );
 
+  const currentUserKey = user ? `${user.id}:${user.text}` : null;
+  const [prevUserKey, setPrevUserKey] = useState<string | null>(currentUserKey);
   const [llmActions, setLlmActions] = useState<AgentAction[]>([]);
   const [cards, setCards] = useState<Record<string, CardState>>({});
+
+  if (currentUserKey !== prevUserKey) {
+    setPrevUserKey(currentUserKey);
+    setLlmActions([]);
+    setCards({});
+  }
 
   useEffect(() => {
     if (!enabled || detection !== "llm" || !user?.id) {
@@ -123,7 +131,9 @@ export function AgentActions({
 
   // Cada mensagem começa sem cards: o resultado da anterior não vale para a
   // pergunta nova. Vivem só na sessão, como as settings.
-  useEffect(() => setCards({}), [user?.id, cardMode]);
+  useEffect(() => {
+    setCards({});
+  }, [cardMode]);
 
   const openExternal = useCallback(
     (action: AgentAction, via: "link" | "api" | "card-footer") => {

@@ -172,6 +172,28 @@ export type AgentLlmModeId = (typeof AGENT_LLM_MODES)[number]["id"];
 
 export const AGENT_LLM_MODE_DEFAULT: AgentLlmModeId = "link";
 
+/** Como o sistema deve entregar a resposta do ConsBOT:
+ *
+ * `auto` — PADRÃO. Chama a resposta completa da LLM logo no início (streaming).
+ * `pill` — Quando a triagem identifica resposta direta, exibe resposta curta e o pill "Resposta completa".
+ */
+export const AGENT_FULL_ANSWER_MODES = [
+  {
+    id: "auto",
+    label: "Automática",
+    description: "Dispara a resposta completa direto.",
+  },
+  {
+    id: "pill",
+    label: "Via Pill",
+    description: "Resposta curta + pill 'Resposta completa'.",
+  },
+] as const;
+
+export type AgentFullAnswerModeId = (typeof AGENT_FULL_ANSWER_MODES)[number]["id"];
+
+export const AGENT_FULL_ANSWER_DEFAULT: AgentFullAnswerModeId = "auto";
+
 /** Quantos resultados pedir ao Main-Server e quantos mostrar antes do
  * «ver mais». Buscar mais do que se mostra é o que permite expandir sem uma
  * segunda ida à rede. */

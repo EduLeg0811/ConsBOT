@@ -5,8 +5,11 @@ import {
   AGENT_CLASSIFIER_MODEL,
   AGENT_CLASSIFIER_REASONING,
   AGENT_DETECTIONS,
+  AGENT_FULL_ANSWER_DEFAULT,
+  AGENT_FULL_ANSWER_MODES,
   AGENT_LLM_MODES,
   type AgentDetectionId,
+  type AgentFullAnswerModeId,
   type AgentLlmModeId,
 } from "@/agent/config";
 import { agentInstructionsFor } from "@/agent/planner/prompt";
@@ -100,6 +103,29 @@ export function AgentSettingsSection({ value, onChange, isAdmin, english }: Prop
                 type="button"
                 disabled={!value.enabled}
                 onClick={() => set({ action: mode.id as AgentLlmModeId })}
+              >
+                <span className="block text-xs font-medium">{mode.label}</span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                  {mode.description}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Resposta Completa: automática (chama modelo completo de imediato) ou via pill (resposta curta + botão). */}
+      {value.detection === "llm" ? (
+        <div className="space-y-2">
+          <label className="text-sm font-medium leading-none">Resposta da LLM</label>
+          <div className="grid grid-cols-2 gap-2">
+            {AGENT_FULL_ANSWER_MODES.map((mode) => (
+              <button
+                className={optionClass((value.fullAnswer ?? AGENT_FULL_ANSWER_DEFAULT) === mode.id)}
+                key={mode.id}
+                type="button"
+                disabled={!value.enabled}
+                onClick={() => set({ fullAnswer: mode.id as AgentFullAnswerModeId })}
               >
                 <span className="block text-xs font-medium">{mode.label}</span>
                 <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">

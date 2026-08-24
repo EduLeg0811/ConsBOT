@@ -1,8 +1,10 @@
 import {
   AGENT_DETECTION_DEFAULT,
+  AGENT_FULL_ANSWER_DEFAULT,
   AGENT_LLM_MODE_DEFAULT,
   AGENT_MODE,
   type AgentDetectionId,
+  type AgentFullAnswerModeId,
   type AgentLlmModeId,
 } from "@/agent/config";
 
@@ -22,6 +24,8 @@ export type AgentSettings = {
   prompt: string;
   /** No modo `llm`, se o botão abre o módulo externo ou consulta a API. */
   action: AgentLlmModeId;
+  /** Resposta completa automática ou via pill quando a triagem resolver diretamente. */
+  fullAnswer: AgentFullAnswerModeId;
 };
 
 export const AGENT_SETTINGS_DEFAULT: AgentSettings = {
@@ -29,4 +33,5 @@ export const AGENT_SETTINGS_DEFAULT: AgentSettings = {
   detection: AGENT_DETECTION_DEFAULT,
   prompt: "",
   action: AGENT_LLM_MODE_DEFAULT,
+  fullAnswer: AGENT_FULL_ANSWER_DEFAULT,
 };
