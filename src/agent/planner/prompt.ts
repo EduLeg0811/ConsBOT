@@ -45,7 +45,6 @@ const CLOSING_PT = [
   "Em delivery, card é o padrão e responde à maioria dos casos.",
   "Use context SOMENTE quando responder sem o dado exato produziria uma resposta ERRADA ou impossível de dar — o número da página, a ocorrência literal a ser transcrita, a referência bibliográfica a ser copiada. Se a resposta se sustenta sem a busca, e a ação é apenas comodidade para quem perguntou, é card.",
   "Pedir context custa segundos de espera antes de a resposta começar. Só vale quando o dado é indispensável, não quando é apenas útil.",
-  "both é raro: exige que o dado seja indispensável à resposta E que a busca completa interesse por si.",
 ].join("\n");
 
 const CLOSING_EN = [
@@ -53,7 +52,6 @@ const CLOSING_EN = [
   "In delivery, card is the default and covers most cases.",
   "Use context ONLY when answering without the exact datum would produce a WRONG or impossible answer — the page number, the literal occurrence to be transcribed, the bibliographic reference to be copied. If the answer stands without the lookup, and the action is merely a convenience for the reader, it is card.",
   "Asking for context costs seconds of waiting before the answer starts. It is only worth it when the datum is indispensable, not when it is merely useful.",
-  "both is rare: it requires the datum to be indispensable to the answer AND the full search to be of interest on its own.",
 ].join("\n");
 
 /** Instruções completas do planejador, no idioma da base ativa.

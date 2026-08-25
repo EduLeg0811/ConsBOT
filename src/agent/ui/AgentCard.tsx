@@ -5,6 +5,18 @@ import { Streamdown } from "streamdown";
 import { AGENT_CARD_PREVIEW } from "@/agent/config";
 import type { AgentAction, AgentCard as AgentCardData } from "@/agent/types";
 
+/** «12 resultados» quando o número é a contagem, «12+ resultados» quando é só
+ * o que coube no lote. Sem o sinal, o mesmo rótulo dizia coisas diferentes
+ * conforme a ferramenta, e o card afirmava um total que não conhecia. */
+function countLabel(card: AgentCardData, english: boolean): string {
+  if (card.items.length === 0) return english ? "no results" : "nenhum resultado";
+
+  const count = `${card.total}${card.saturated ? "+" : ""}`;
+  const plural = card.total === 1 && !card.saturated ? "" : "s";
+
+  return english ? `${count} result${plural}` : `${count} resultado${plural}`;
+}
+
 type Props = {
   action: AgentAction;
   card: AgentCardData | null;
@@ -56,15 +68,7 @@ export function AgentCard({ action, card, loading, error, english, onOpenExterna
     <div className="overflow-hidden rounded-xl border border-chart-2/40 bg-card">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-chart-2/25 px-3 py-2">
         <span className="text-xs font-medium text-foreground">{action.label}</span>
-        <span className="text-[11px] text-muted-foreground">
-          {card.items.length === 0
-            ? english
-              ? "no results"
-              : "nenhum resultado"
-            : english
-              ? `${card.total} result${card.total === 1 ? "" : "s"}`
-              : `${card.total} resultado${card.total === 1 ? "" : "s"}`}
-        </span>
+        <span className="text-[11px] text-muted-foreground">{countLabel(card, english)}</span>
       </div>
 
       {visible.length > 0 ? (

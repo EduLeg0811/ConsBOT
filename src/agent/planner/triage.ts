@@ -32,6 +32,24 @@ export async function triageAgent(ctx: AgentContext): Promise<AgentTriage> {
   // decidem quem responde. O caminho segue completo, como antes.
   if (ctx.settings.detection !== "llm") return BYPASS;
 
+  // Dois modos precisam do plano ANTES do envio: «Alimentar LLM», que anexa o
+  // resultado da consulta ao prompt, e a resposta via pill, que precisa saber
+  // se a triagem responde sozinha. Em qualquer outro arranjo — e o padrão é um
+  // deles — o plano só serve à barra de botões, que aparece DEPOIS da
+  // resposta: esperar por ele atrasaria toda pergunta para nada.
+  //
+  // O disparo sem `await` não é fogo-e-esquece: `planAgent` guarda a promessa,
+  // e é dela que a barra de botões se serve segundos depois. A chamada
+  // acontece igual; o que deixa de existir é a espera.
+  const needsPlan = ctx.settings.action === "context" || ctx.settings.fullAnswer === "pill";
+  if (!needsPlan) {
+    void planAgent(ctx).catch(() => {
+      // Telemetria de agente nunca interrompe a conversa — nem quando ninguém
+      // está esperando por ela.
+    });
+    return BYPASS;
+  }
+
   try {
     const plan = await planAgent(ctx);
     // `prepareAgentContext` reaproveita este mesmo plano — `planAgent` guarda o

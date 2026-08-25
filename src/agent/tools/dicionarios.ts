@@ -32,7 +32,10 @@ export const dicionarios: AgentTool = {
     const data = asRecord(
       await get(
         host,
-        `/api/dictionary/search?q=${encodeURIComponent(term)}&max_results=${AGENT_SEARCH_LIMIT}`,
+        // `mode=completo` traz sinônimos E analógico. Sem ele o servidor usa
+        // `analogico`, e a metade sinonímica — que o `describe` promete ao
+        // classificador — nunca voltava.
+        `/api/dictionary/search?q=${encodeURIComponent(term)}&mode=completo&max_results=${AGENT_SEARCH_LIMIT}`,
         signal,
       ),
     );
@@ -54,6 +57,13 @@ export const dicionarios: AgentTool = {
       }
     }
 
-    return { intent: "consulta_dicionarios", term, total: items.length, items };
+    // Cada seção traz até `max_results`, então o teto real é múltiplo dele.
+    return {
+      intent: "consulta_dicionarios",
+      term,
+      total: items.length,
+      saturated: items.length >= AGENT_SEARCH_LIMIT,
+      items,
+    };
   },
 };

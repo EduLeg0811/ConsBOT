@@ -81,7 +81,7 @@ export const bibliografia: AgentTool = {
         };
       });
 
-      return { intent: "bibliografia_livros", term, total: items.length, items };
+      return { intent: "bibliografia_livros", term, total: items.length, saturated: false, items };
     }
 
     const data = asRecord(await post(host, "/api/biblio/wv/reference", { book: term }, signal));
@@ -90,6 +90,6 @@ export const bibliografia: AgentTool = {
       ? [{ source: plain(data.book_title, 80) || term, snippet: reference }]
       : [];
 
-    return { intent: "bibliografia_livros", term, total: items.length, items };
+    return { intent: "bibliografia_livros", term, total: items.length, saturated: false, items };
   },
 };

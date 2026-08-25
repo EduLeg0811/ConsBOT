@@ -121,9 +121,9 @@ function getRagStatus(
   const metadata = userMessage.metadata;
   const vectorStoreId =
     metadata &&
-      typeof metadata === "object" &&
-      "ragVectorStoreId" in metadata &&
-      typeof metadata.ragVectorStoreId === "string"
+    typeof metadata === "object" &&
+    "ragVectorStoreId" in metadata &&
+    typeof metadata.ragVectorStoreId === "string"
       ? (metadata.ragVectorStoreId as ChatSettings["vectorStoreId"])
       : fallbackVectorStoreId;
   const vectorStoreLabel = VECTOR_STORES.find((store) => store.id === vectorStoreId)?.label;
@@ -132,12 +132,13 @@ function getRagStatus(
   const isEnglish = isEnglishVectorStore(vectorStoreId);
 
   return fileSearchPart.state === "output-available"
-    ? `${storeDetail}${totalFiles === undefined
-      ? ""
-      : isEnglish
-        ? ` · ${totalFiles} source${totalFiles === 1 ? "" : "s"}`
-        : ` · ${totalFiles} fonte${totalFiles === 1 ? "" : "s"}`
-    }`
+    ? `${storeDetail}${
+        totalFiles === undefined
+          ? ""
+          : isEnglish
+            ? ` · ${totalFiles} source${totalFiles === 1 ? "" : "s"}`
+            : ` · ${totalFiles} fonte${totalFiles === 1 ? "" : "s"}`
+      }`
     : isEnglish
       ? `Querying ${storeDetail}…`
       : `Consultando ${storeDetail}…`;
@@ -288,12 +289,23 @@ export function ChatWindow({
   const pendingAuditId = useRef<string | null>(null);
   const pendingAccessLogRef = useRef<PendingAccessLog | null>(null);
   const openaiAuditRef = useRef<OpenAIAuditEvent | null>(null);
+  // O `status` do useChat só vira "submitted" depois do sendMessage, que roda
+  // vários renders depois de o envio começar. Sem esta marca, o efeito de
+  // fechamento via `!isBusy` disparava já no eco da pergunta e gravava a
+  // resposta da rodada anterior.
+  const streamStartedRef = useRef(false);
+  const baselineAssistantIdRef = useRef<string | undefined>(undefined);
+  // Rodada em preparo: já saiu do formulário, ainda não chegou ao useChat.
+  // O ref tranca reentrada dentro do próprio `submit`; o estado é o que a
+  // interface precisa para não parecer ociosa nesse intervalo.
+  const submittingRef = useRef(false);
+  const [isPreparing, setIsPreparing] = useState(false);
   const auditCompleteRef = useRef(onAuditComplete);
   const initialUrlQuestionProcessedRef = useRef(false);
   auditCompleteRef.current = onAuditComplete;
 
   // Bloco que o módulo AGENT injeta no prompt desta requisição, no modo
-  // «Alimentar resposta». Vazio em todos os outros casos — inclusive quando o
+  // «Alimentar LLM». Vazio em todos os outros casos — inclusive quando o
   // planejador decide que a resposta não depende de busca exata.
   const agentContextRef = useRef("");
 
@@ -326,7 +338,7 @@ export function ChatWindow({
     `GPT-5.6 ${activeModel?.label.replace("ConsBOT ", "") ?? "Terra"}`,
     !isMobile ? REASONING_LABELS[settings.reasoningEffort] : undefined,
     { low: "Low verbosity", medium: "Medium verbosity", high: "High verbosity" }[
-    settings.textVerbosity
+      settings.textVerbosity
     ],
     settings.vectorStoreId === "none"
       ? isEnglish
@@ -381,9 +393,9 @@ export function ChatWindow({
               // a requisição realmente usa.
               ...(vectorStores.length > 0
                 ? {
-                  toolChoice: { type: "file_search" },
-                  vectorMaxResults: settingsRef.current.vectorMaxResults,
-                }
+                    toolChoice: { type: "file_search" },
+                    vectorMaxResults: settingsRef.current.vectorMaxResults,
+                  }
                 : {}),
               stream: true,
             },
@@ -416,6 +428,7 @@ export function ChatWindow({
           });
           pendingAccessLogRef.current = null;
         }
+        streamStartedRef.current = false;
         if (pendingAuditId.current) {
           auditCompleteRef.current(
             pendingAuditId.current,
@@ -458,10 +471,24 @@ export function ChatWindow({
   }, [isBusy, isMobile, threadId, input]);
 
   useEffect(() => {
-    if (isBusy || (!pendingAuditId.current && !pendingAccessLogRef.current)) return;
+    if (isBusy) {
+      // A rodada começou de fato; só a partir daqui `!isBusy` significa
+      // «terminou», e não «ainda nem saiu».
+      streamStartedRef.current = true;
+      return;
+    }
+    if (!streamStartedRef.current) return;
+    if (!pendingAuditId.current && !pendingAccessLogRef.current) {
+      streamStartedRef.current = false;
+      return;
+    }
     const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
-    const assistantText = lastAssistant ? getMessageText(lastAssistant) : "";
+    // Resposta ainda com o id de marco = nenhuma resposta nova chegou; gravar
+    // o texto dela alinharia a pergunta desta rodada com a resposta da anterior.
+    const isFresh = Boolean(lastAssistant) && lastAssistant?.id !== baselineAssistantIdRef.current;
+    const assistantText = isFresh && lastAssistant ? getMessageText(lastAssistant) : "";
     const first10Lines = assistantText ? getFirstLines(assistantText, 10) : undefined;
+    streamStartedRef.current = false;
 
     if (pendingAccessLogRef.current) {
       logFeatureAccess({
@@ -479,16 +506,16 @@ export function ChatWindow({
     }
 
     if (pendingAuditId.current) {
-      if (lastAssistant) {
+      if (isFresh && lastAssistant) {
         onAuditComplete(pendingAuditId.current, {
           openaiRequest: openaiAuditRef.current?.request,
           response: openaiAuditRef.current
             ? {
-              responseId: openaiAuditRef.current.responseId,
-              model: openaiAuditRef.current.model,
-              finishReason: openaiAuditRef.current.finishReason,
-              usage: openaiAuditRef.current.usage,
-            }
+                responseId: openaiAuditRef.current.responseId,
+                model: openaiAuditRef.current.model,
+                finishReason: openaiAuditRef.current.finishReason,
+                usage: openaiAuditRef.current.usage,
+              }
             : { aviso: "O stream terminou sem metadados de auditoria da OpenAI." },
           uiResponse: lastAssistant,
         });
@@ -507,120 +534,167 @@ export function ChatWindow({
   const submit = useCallback(
     async (text: string, forceFull = false) => {
       const value = text.trim();
-      if (!value || isBusy) return;
-      openaiAuditRef.current = null;
-      pendingAuditId.current = onAuditStart({
-        endpoint: `${API_BASE}/api/llm`,
-        sentAt: new Date().toISOString(),
-        body: {
-          messages: [...messages, { role: "user", parts: [{ type: "text", text: value }] }],
-          model: settingsRef.current.model,
-          vectorStores: vectorStoresFor(settingsRef.current.vectorStoreId),
-          systemPrompt: systemPromptWithVerbosity(settingsRef.current),
-          reasoningEffort: settingsRef.current.reasoningEffort,
-          verbosity: settingsRef.current.textVerbosity,
-          ...(vectorStoresFor(settingsRef.current.vectorStoreId).length > 0
-            ? { vectorMaxResults: settingsRef.current.vectorMaxResults }
+      // `isBusy` só passa a valer quando o sendMessage vai à rede, e antes
+      // dele há uma triagem que pode levar segundos. Sem esta trava, um
+      // segundo envio nesse intervalo abria uma rodada paralela — dois ecos,
+      // duas chamadas, e os refs da primeira sobrescritos pela segunda.
+      if (!value || isBusy || submittingRef.current) return;
+      submittingRef.current = true;
+      setIsPreparing(true);
+      try {
+        openaiAuditRef.current = null;
+        // Marco desta rodada: a resposta que já está na tela. Enquanto a última
+        // resposta for esta, não há nada novo para registrar no painel de logs.
+        streamStartedRef.current = false;
+        baselineAssistantIdRef.current = [...messages]
+          .reverse()
+          .find((message) => message.role === "assistant")?.id;
+        const current = settingsRef.current;
+        const store = VECTOR_STORES.find((item) => item.id === current.vectorStoreId);
+        const telemetryMeta = {
+          model: MODELS.find((item) => item.id === current.model)?.label ?? current.model,
+          // O rótulo da base diz mais que o `vs_…` no painel; "Nenhuma" quando sem RAG.
+          vector_store: store?.label ?? current.vectorStoreId,
+          // O systemPrompt tem milhares de caracteres e é derivado do formato,
+          // então registra-se o formato, que o identifica sem inflar o log.
+          response_format: current.responseFormat,
+          reasoning_effort: current.reasoningEffort,
+          verbosity: current.textVerbosity,
+          ...(vectorStoresFor(current.vectorStoreId).length > 0
+            ? { vector_max_results: current.vectorMaxResults }
             : {}),
-          stream: true,
-        },
-      });
-      const current = settingsRef.current;
-      const store = VECTOR_STORES.find((item) => item.id === current.vectorStoreId);
-      const telemetryMeta = {
-        model: MODELS.find((item) => item.id === current.model)?.label ?? current.model,
-        // O rótulo da base diz mais que o `vs_…` no painel; "Nenhuma" quando sem RAG.
-        vector_store: store?.label ?? current.vectorStoreId,
-        // O systemPrompt tem milhares de caracteres e é derivado do formato,
-        // então registra-se o formato, que o identifica sem inflar o log.
-        response_format: current.responseFormat,
-        reasoning_effort: current.reasoningEffort,
-        verbosity: current.textVerbosity,
-        ...(vectorStoresFor(current.vectorStoreId).length > 0
-          ? { vector_max_results: current.vectorMaxResults }
-          : {}),
-      };
+        };
 
-      setInput("");
-      setHasTyped(true);
+        setInput("");
+        setHasTyped(true);
 
-      // O eco da pergunta entra ANTES da triagem. Ele não depende de LLM
-      // nenhuma, e esperar a triagem para exibi-lo deixava a tela parada por
-      // um segundo depois do envio — como se nada tivesse acontecido.
-      const echoId = newMessageId();
-      const historico = lastAssistantText(messages);
-      setMessages((current) => [
-        ...current,
-        { id: echoId, role: "user", parts: [{ type: "text", text: value }] },
-      ]);
+        // O eco da pergunta entra ANTES da triagem. Ele não depende de LLM
+        // nenhuma, e esperar a triagem para exibi-lo deixava a tela parada por
+        // um segundo depois do envio — como se nada tivesse acontecido.
+        const echoId = newMessageId();
+        const historico = lastAssistantText(messages);
+        setMessages((existing) => [
+          ...existing,
+          { id: echoId, role: "user", parts: [{ type: "text", text: value }] },
+        ]);
 
-      // Triagem: o único ponto em que o módulo interfere no fluxo. Com o Modo
-      // Agente desligado devolve bypass sem tocar em rede, e daqui para baixo
-      // tudo se comporta como antes dele existir.
-      const triage = forceFull
-        ? { mode: "full" as const, answer: "", context: "" }
-        : await triageAgent({
-          userText: value,
-          assistantText: historico,
-          settings: settingsRef.current.agent,
-          host: agentHost,
-          threadId,
-        });
+        // Triagem: o único ponto em que o módulo interfere no fluxo. Com o Modo
+        // Agente desligado devolve bypass sem tocar em rede, e daqui para baixo
+        // tudo se comporta como antes dele existir.
+        const triage = forceFull
+          ? { mode: "full" as const, answer: "", context: "" }
+          : await triageAgent({
+              userText: value,
+              assistantText: historico,
+              settings: settingsRef.current.agent,
+              host: agentHost,
+              threadId,
+            });
 
-      // A triagem resolveu sozinha: a resposta é curta e a busca vem nos pills.
-      // Só intercepta para exibir a resposta curta e o pill «Resposta completa»
-      // se a opção fullAnswer estiver configurada como "pill".
-      // No padrão ("auto"), a chamada ao modelo completo segue diretamente.
-      const allowDirect = settingsRef.current.agent.fullAnswer === "pill";
-      if (!forceFull && allowDirect && triage.mode === "direct") {
-        logFeatureAccess({
-          module: "consbot",
-          action: "ask",
-          label: "Pergunta ao ConsBOT",
-          value,
-          chat_id: threadId,
-          meta: {
-            ...telemetryMeta,
-            response: getFirstLines(triage.answer, 10),
+        // A auditoria abre DEPOIS da triagem porque é aqui que o systemPrompt
+        // fica conhecido: no modo «Alimentar LLM» ele leva o bloco de consulta
+        // às bases, e auditar o prompt sem esse bloco descrevia uma requisição
+        // diferente da que sai.
+        const systemPrompt = systemPromptWithVerbosity(current) + triage.context;
+        // Vale para o envio e para um eventual «tentar novamente» deste turno.
+        // Fica aqui, e não só no caminho completo, para que uma resposta direta
+        // não deixe o bloco da rodada anterior pendurado no ref.
+        agentContextRef.current = triage.context;
+        pendingAuditId.current = onAuditStart({
+          endpoint: `${API_BASE}/api/llm`,
+          sentAt: new Date().toISOString(),
+          body: {
+            messages: [...messages, { role: "user", parts: [{ type: "text", text: value }] }],
+            model: current.model,
+            vectorStores: vectorStoresFor(current.vectorStoreId),
+            systemPrompt,
+            reasoningEffort: current.reasoningEffort,
+            verbosity: current.textVerbosity,
+            ...(vectorStoresFor(current.vectorStoreId).length > 0
+              ? { vectorMaxResults: current.vectorMaxResults }
+              : {}),
+            stream: true,
           },
         });
-        setMessages((current) => [
-          ...current,
-          {
+
+        // A triagem resolveu sozinha: a resposta é curta e a busca vem nos pills.
+        // Só intercepta para exibir a resposta curta e o pill «Resposta completa»
+        // se a opção fullAnswer estiver configurada como "pill".
+        // No padrão ("auto"), a chamada ao modelo completo segue diretamente.
+        const allowDirect = settingsRef.current.agent.fullAnswer === "pill";
+        if (!forceFull && allowDirect && triage.mode === "direct") {
+          logFeatureAccess({
+            module: "consbot",
+            action: "ask",
+            label: "Pergunta ao ConsBOT",
+            value,
+            chat_id: threadId,
+            meta: {
+              ...telemetryMeta,
+              response: getFirstLines(triage.answer, 10),
+            },
+          });
+          const directMessage: ConsBotUIMessage = {
             id: newMessageId(),
             role: "assistant",
             parts: [{ type: "text", text: triage.answer }],
             metadata: { agentDirect: value },
-          },
-        ]);
-        return;
+          };
+          setMessages((existing) => [...existing, directMessage]);
+
+          // Nenhuma chamada saiu: a auditoria aberta acima fecha aqui mesmo. Sem
+          // isto ela ficava `streaming` para sempre, descrevendo uma requisição
+          // que nunca aconteceu.
+          if (pendingAuditId.current) {
+            onAuditComplete(pendingAuditId.current, {
+              response: {
+                origem: "triagem do módulo AGENT",
+                aviso: "Respondida pela triagem; nenhuma chamada à OpenAI foi feita.",
+              },
+              uiResponse: directMessage,
+            });
+            pendingAuditId.current = null;
+          }
+          return;
+        }
+
+        pendingAccessLogRef.current = {
+          action: "ask",
+          label: "Pergunta ao ConsBOT",
+          value,
+          chat_id: threadId,
+          meta: telemetryMeta,
+        };
+
+        // O caminho completo passa pelo transporte, que insere a mensagem do
+        // usuário por conta própria — o eco provisório sai para não duplicar.
+        //
+        // A troca deixa uma lacuna de um quadro (~28 ms medidos): o sendMessage
+        // insere a dele depois de um await interno, então as duas atualizações
+        // não caem no mesmo lote. Some se um dia o SDK aceitar reaproveitar o
+        // id do eco; até lá, um quadro é melhor que a pergunta duplicada.
+        setMessages((existing) => existing.filter((message) => message.id !== echoId));
+
+        void sendMessage({
+          text: value,
+          metadata: { ragVectorStoreId: settingsRef.current.vectorStoreId },
+        });
+      } finally {
+        // A partir daqui quem sinaliza atividade é o `status` do useChat.
+        submittingRef.current = false;
+        setIsPreparing(false);
       }
-
-      pendingAccessLogRef.current = {
-        action: "ask",
-        label: "Pergunta ao ConsBOT",
-        value,
-        chat_id: threadId,
-        meta: telemetryMeta,
-      };
-
-      agentContextRef.current = triage.context;
-
-      // O caminho completo passa pelo transporte, que insere a mensagem do
-      // usuário por conta própria — o eco provisório sai para não duplicar.
-      //
-      // A troca deixa uma lacuna de um quadro (~28 ms medidos): o sendMessage
-      // insere a dele depois de um await interno, então as duas atualizações
-      // não caem no mesmo lote. Some se um dia o SDK aceitar reaproveitar o
-      // id do eco; até lá, um quadro é melhor que a pergunta duplicada.
-      setMessages((current) => current.filter((message) => message.id !== echoId));
-
-      void sendMessage({
-        text: value,
-        metadata: { ragVectorStoreId: settingsRef.current.vectorStoreId },
-      });
     },
-    [agentHost, isBusy, messages, onAuditStart, sendMessage, setMessages, threadId],
+    [
+      agentHost,
+      isBusy,
+      messages,
+      onAuditComplete,
+      onAuditStart,
+      sendMessage,
+      setMessages,
+      threadId,
+    ],
   );
 
   // Refaz a pergunta pelo caminho completo. Descarta o par que a triagem
@@ -675,38 +749,38 @@ export function ChatWindow({
         previousThemesRef.current.length > 0
           ? isEnglish
             ? `\nConscientiology themes/concepts already covered previously in this session (DO NOT repeat or approach these themes):\n${previousThemesRef.current
-              .map((theme) => `- ${theme}`)
-              .join(
-                "\n",
-              )}\n\nChoose completely new and distinct themes within the wide universe of Conscientiology.\n`
+                .map((theme) => `- ${theme}`)
+                .join(
+                  "\n",
+                )}\n\nChoose completely new and distinct themes within the wide universe of Conscientiology.\n`
             : `\nTemáticas/conceitos da Conscienciologia já abordados anteriormente nesta sessão (NÃO repita nem se aproxime dessas temáticas):\n${previousThemesRef.current
-              .map((theme) => `- ${theme}`)
-              .join(
-                "\n",
-              )}\n\nEscolha temáticas completamente inéditas e distintas dentro do amplo universo da Conscienciologia.\n`
+                .map((theme) => `- ${theme}`)
+                .join(
+                  "\n",
+                )}\n\nEscolha temáticas completamente inéditas e distintas dentro do amplo universo da Conscienciologia.\n`
           : "";
 
       const prompt = isEnglish
         ? `Generate exactly ${expectedCount} suggested questions about the Conscientiology corpus following strictly these guidelines:\n\n` +
-        `- For each item return the topic ('topic') and the question ('question').\n` +
-        `- Each question must address a completely different topic or concept from the other questions in this batch.\n` +
-        `- Freely choose new topics and technical terms of Conscientiology, widely varying the topics in each generation.\n` +
-        `- Do not repeat topics covered in previous rounds.\n` +
-        `- Generate questions with at most 10 words each.\n` +
-        `- Write in British English, in a clear, natural manner, ending with a question mark.\n` +
-        `- Do not ask overly narrow questions or questions that can be answered with yes or no.\n` +
-        `- Prefer using Conscientiological terms and vocabulary.\n` +
-        previousThemesContext
+          `- For each item return the topic ('topic') and the question ('question').\n` +
+          `- Each question must address a completely different topic or concept from the other questions in this batch.\n` +
+          `- Freely choose new topics and technical terms of Conscientiology, widely varying the topics in each generation.\n` +
+          `- Do not repeat topics covered in previous rounds.\n` +
+          `- Generate questions with at most 10 words each.\n` +
+          `- Write in British English, in a clear, natural manner, ending with a question mark.\n` +
+          `- Do not ask overly narrow questions or questions that can be answered with yes or no.\n` +
+          `- Prefer using Conscientiological terms and vocabulary.\n` +
+          previousThemesContext
         : `Gere exatamente ${expectedCount} perguntas de sugestão sobre o corpus da Conscienciologia seguindo estritamente estas diretrizes:\n\n` +
-        `- Para cada item retorne a temática ('topic') e a pergunta ('question').\n` +
-        `- Cada pergunta deve abordar uma temática ou conceito totalmente diferente das outras perguntas deste lote.\n` +
-        `- Escolha livremente novas temáticas e termos técnicos da Conscienciologia, variando amplamente os tópicos a cada geração.\n` +
-        `- Não repita temáticas abordadas em rodadas anteriores.\n` +
-        `- Gere perguntas com no máximo 10 palavras cada uma.\n` +
-        `- Escreva em português do Brasil, de forma clara, natural e terminando com ponto de interrogação.\n` +
-        `- Não faça perguntas muito fechadas ou que possam ser respondidas com sim ou não.\n` +
-        `- Prefira usar termos e jargões conscienciológicos.\n` +
-        previousThemesContext;
+          `- Para cada item retorne a temática ('topic') e a pergunta ('question').\n` +
+          `- Cada pergunta deve abordar uma temática ou conceito totalmente diferente das outras perguntas deste lote.\n` +
+          `- Escolha livremente novas temáticas e termos técnicos da Conscienciologia, variando amplamente os tópicos a cada geração.\n` +
+          `- Não repita temáticas abordadas em rodadas anteriores.\n` +
+          `- Gere perguntas com no máximo 10 palavras cada uma.\n` +
+          `- Escreva em português do Brasil, de forma clara, natural e terminando com ponto de interrogação.\n` +
+          `- Não faça perguntas muito fechadas ou que possam ser respondidas com sim ou não.\n` +
+          `- Prefira usar termos e jargões conscienciológicos.\n` +
+          previousThemesContext;
 
       const schemaDescription = isEnglish
         ? `An object with exactly ${expectedCount} suggestions containing topic ('topic') and question ('question') on Conscientiology, with varied themes and short questions (max 10 words) in British English.`
@@ -744,9 +818,9 @@ export function ChatWindow({
         if (!response.ok) {
           throw new Error(
             result.detail ||
-            (isEnglish
-              ? "Unable to generate new questions."
-              : "Não foi possível gerar novas perguntas."),
+              (isEnglish
+                ? "Unable to generate new questions."
+                : "Não foi possível gerar novas perguntas."),
           );
         }
         const parsed = result.content ? (JSON.parse(result.content) as SuggestionsPayload) : {};
@@ -1006,11 +1080,11 @@ export function ChatWindow({
             const ragStatus =
               message.role === "user"
                 ? getRagStatus(
-                  message,
-                  messages[messageIndex + 1],
-                  settings.vectorStoreId,
-                  sourceCounts,
-                )
+                    message,
+                    messages[messageIndex + 1],
+                    settings.vectorStoreId,
+                    sourceCounts,
+                  )
                 : null;
             return (
               <div key={message.id} className="w-full">
@@ -1037,7 +1111,7 @@ export function ChatWindow({
                       if (part.type === "text") {
                         const text =
                           message.role === "assistant" &&
-                            settings.responseFormat === "conscienciological"
+                          settings.responseFormat === "conscienciological"
                             ? normalizeConscienciologicalLists(part.text)
                             : part.text;
 
@@ -1074,7 +1148,7 @@ export function ChatWindow({
             );
           })}
 
-          {status === "submitted" ? (
+          {status === "submitted" || isPreparing ? (
             <Shimmer className="text-sm">{isEnglish ? "Thinking..." : "Pensando..."}</Shimmer>
           ) : null}
 
@@ -1161,7 +1235,7 @@ export function ChatWindow({
           <div className="flex shrink-0 items-center pr-2">
             <PromptInputSubmit
               status={status}
-              disabled={!isBusy && input.trim().length === 0}
+              disabled={!isBusy && (isPreparing || input.trim().length === 0)}
               onClick={isBusy ? stopWithAudit : undefined}
               className="size-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/35 disabled:text-primary-foreground"
             >

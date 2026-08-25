@@ -33,9 +33,9 @@ export type AgentAction = {
  * devolvem isto — é o ponto em que os dois modos se encontram. */
 export type AgentMatch = {
   intent: AgentIntentId;
-  /** Vazio quando a intenção não precisa de termo (ver actions.ts). */
+  /** Vazio quando a intenção não precisa de termo (ver `termRequired` em AgentTool). */
   term: string;
-  /** Só para `search_verbete`, e só no modo «Buscar aqui» — ver AGENT_VERBETE_FIELDS. */
+  /** Só para `search_verbete`, e só no modo «Busca Integrada» — ver AGENT_VERBETE_FIELDS. */
   field?: AgentVerbeteField;
   /** Só para `search_book`: id da obra quando o usuário nomeia uma. Vazio busca
    * em todas. Ver AGENT_BOOKS. */
@@ -52,6 +52,12 @@ export type AgentCard = {
   term: string;
   /** Total no corpus quando o endpoint informa; senão, o tamanho de `items`. */
   total: number;
+  /** `total` é um piso, não a contagem exata: o lote veio cheio e o endpoint
+   * não informa quantos existem além dele. O card mostra «12+» em vez de «12»,
+   * que era o número que enganava — o mesmo rótulo significava coisas
+   * diferentes em `search_book` (tamanho do lote) e em `search_verbete`
+   * (`totalFound` de verdade). */
+  saturated: boolean;
   items: AgentCardItem[];
 };
 
@@ -109,14 +115,14 @@ export type AgentTool = {
   /** O botão: rótulo e destino externo. */
   toAction: (match: AgentMatch, ctx: AgentContext) => AgentAction;
 
-  /** A consulta ao Main-Server, no modo «Buscar aqui». */
+  /** A consulta ao Main-Server, no modo «Busca Integrada». */
   execute: (match: AgentMatch, ctx: AgentContext, signal?: AbortSignal) => Promise<AgentCard>;
 };
 
 /** O que o planejador devolve: as ações e como ele quer entregá-las.
  *
- * `delivery` só é consultado no modo «Alimentar resposta»; nos modos «Abrir
- * módulo» e «Buscar aqui» quem decide a entrega é o modo, e o campo é
+ * `delivery` só é consultado no modo «Alimentar LLM»; nos modos «Abrir
+ * módulo» e «Busca Integrada» quem decide a entrega é o modo, e o campo é
  * ignorado. Ver AGENT_DELIVERIES em config.ts. */
 export type AgentPlan = {
   actions: AgentAction[];

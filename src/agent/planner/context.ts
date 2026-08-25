@@ -1,4 +1,4 @@
-import { AGENT_CONTEXT_ITEMS } from "@/agent/config";
+import { AGENT_CONTEXT_ITEMS, AGENT_LOOKUP_TIMEOUT_MS } from "@/agent/config";
 import { planAgent } from "@/agent/planner/plan";
 import { executeAgentAction, rememberCard } from "@/agent/tools/registry";
 import type { AgentCard, AgentContext } from "@/agent/types";
@@ -44,13 +44,17 @@ export async function prepareAgentContext(ctx: AgentContext): Promise<string> {
     // necessário para responder — basta oferecer o botão.
     if (plan.delivery === "card") return "";
 
+    // Teto de espera por consulta: este é o único caminho do módulo que roda
+    // ANTES da resposta, e uma busca pendurada seguraria a conversa inteira.
+    // Estourar o teto derruba só o bloco daquela ferramenta — o `catch` abaixo
+    // já trata isso como «sem resultado».
     const cards = await Promise.all(
       plan.actions.map((action) =>
-        executeAgentAction(action, ctx)
+        executeAgentAction(action, ctx, AbortSignal.timeout(AGENT_LOOKUP_TIMEOUT_MS))
           .then((card) => {
             // O botão do card continua na tela depois da resposta; guardar
             // aqui evita repetir a mesma consulta ao clicar nele.
-            rememberCard(action, card);
+            rememberCard(action, ctx, card);
             return card;
           })
           .catch(() => null as AgentCard | null),

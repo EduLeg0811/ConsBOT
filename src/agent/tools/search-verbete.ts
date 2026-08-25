@@ -23,6 +23,11 @@ const FIELD_PATTERNS: Array<[AgentVerbeteField, RegExp]> = [
   ["titulo", /\bt[íi]tulos?\b/iu],
 ];
 
+/** Teto de contagem do endpoint: `search_verbetes` para de contar em
+ * MAX_BOOK_SEARCH (200) e devolve `totalFound` saturado. Bater nesse número
+ * significa «pelo menos 200», nunca «exatamente 200». */
+const VERBETE_TOTAL_CAP = 200;
+
 /** `field` do planejador → coluna do endpoint. Vazio busca na Definologia. */
 const COLUMN: Record<string, "author" | "title" | "area" | "text"> = {
   autor: "author",
@@ -59,7 +64,7 @@ function detectField(text: string): AgentVerbeteField | undefined {
  *
  * A página externa faz busca léxica na Definologia com a base fixa na
  * Enciclopédia e não filtra por campo; o endpoint do Main-Server filtra. Por
- * isso o `field` só tem efeito no modo «Buscar aqui» — decisão registrada no
+ * isso o `field` só tem efeito no modo «Busca Integrada» — decisão registrada no
  * documento, não descuido. */
 export const searchVerbete: AgentTool = {
   name: "search_verbete",
@@ -156,6 +161,17 @@ export const searchVerbete: AgentTool = {
     // `totalFound` é o total no corpus (saturado em 200 pelo servidor);
     // `items` traz só o lote pedido.
     const total = typeof data.totalFound === "number" ? data.totalFound : items.length;
-    return { intent: "search_verbete", term, total, items };
+    // O servidor satura `totalFound` em 200; acima disso o número também é um
+    // piso, e o card avisa.
+    return {
+      intent: "search_verbete",
+      term,
+      total,
+      saturated:
+        typeof data.totalFound === "number"
+          ? total >= VERBETE_TOTAL_CAP
+          : items.length >= AGENT_SEARCH_LIMIT,
+      items,
+    };
   },
 };

@@ -50,7 +50,7 @@ function buildSchema() {
         type: "string",
         enum: [...AGENT_DELIVERIES],
         description:
-          "Como entregar: card (botão ao lado da resposta), context (o resultado alimenta a resposta) ou both.",
+          "Como entregar: card (botão ao lado da resposta) ou context (o resultado alimenta a resposta).",
       },
       answer_mode: {
         type: "string",

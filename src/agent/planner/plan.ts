@@ -3,8 +3,8 @@ import {
   AGENT_CLASSIFIER_MODEL,
   AGENT_CLASSIFIER_REASONING,
   AGENT_ANSWER_MAX,
-  AGENT_ANSWER_MODES,
   AGENT_DELIVERIES,
+  AGENT_PLANNER_TIMEOUT_MS,
   AGENT_VERBETE_FIELDS,
 } from "@/agent/config";
 import { agentInstructionsFor } from "@/agent/planner/prompt";
@@ -21,10 +21,20 @@ import type {
   AgentVerbeteField,
 } from "@/agent/types";
 
-/** Perguntas curtas demais não carregam pedido de ação; poupa uma chamada. */
-const MIN_TEXT_LENGTH = 8;
+/** Piso de tamanho. Serve só para descartar toque acidental — «a», «?» —, não
+ * para filtrar pergunta curta: era 8 caracteres, e nesse patamar engolia as
+ * saudações («Oi», «Bom dia»), que são justamente o caso que a triagem sabe
+ * responder sozinha. O custo de classificar uma frase de duas letras é o
+ * mesmo de qualquer outra, e é baixo. */
+const MIN_TEXT_LENGTH = 2;
 
 const EMPTY: AgentPlan = { actions: [], delivery: "card", answerMode: "full", answer: "" };
+
+/** Mesma forma de EMPTY, identidade diferente: marca o plano que saiu vazio
+ * por FALHA (rede, timeout, JSON inesperado), e não porque o classificador
+ * decidiu que não havia ação. Só a identidade é usada — nunca vaza para fora
+ * de `planAgent`, que o troca por EMPTY. */
+const FAILED: AgentPlan = { actions: [], delivery: "card", answerMode: "full", answer: "" };
 
 type PlannerPayload = {
   actions?: Array<{ intent?: string; term?: string; field?: string; book?: string }>;
@@ -46,9 +56,25 @@ function asBookId(value: unknown): string | undefined {
 function asAnswerMode(value: unknown): AgentAnswerMode {
   // Viés conservador em código, não só no prompt: qualquer coisa que não seja
   // exatamente "direct" cai em "full". O erro caro é engolir a pergunta.
-  return value === "direct" && (AGENT_ANSWER_MODES as readonly string[]).includes(value)
-    ? "direct"
-    : "full";
+  return value === "direct" ? "direct" : "full";
+}
+
+/** Saudação, agradecimento, despedida ou pergunta sobre o próprio assistente
+ * — o caso (a) das instruções de triagem, o único em que responder sem ação e
+ * sem fontes é seguro.
+ *
+ * É verificado no cliente, e não confiado ao classificador, porque o erro que
+ * ele evita é o mais caro do módulo: responder de cabeça uma pergunta que
+ * dependia do corpus. O `answer_mode` do modelo pede permissão; esta função
+ * concede. */
+const SMALL_TALK =
+  /^(?:\s*(?:ol[áa]|oi|opa|e\s*a[íi]|al[ôo]|bom\s+dia|boa\s+tarde|boa\s+noite|tudo\s+bem|obrigad[oa]|valeu|agradeç[oa]|at[ée]\s+(?:logo|mais)|tchau|adeus|hi|hello|hey|good\s+(?:morning|afternoon|evening)|thanks?|thank\s+you|bye|goodbye|tudo\s+bem\s+com\s+voc[êe]|como\s+(?:vai|est[áa])|como\s+voc[êe]\s+(?:vai|est[áa])|how\s+are\s+you|how(?:'s|\s+is)\s+it\s+going)(?![\p{L}\p{N}])[\s\p{P}]*)+$/iu;
+
+const ABOUT_ASSISTANT =
+  /(?<![\p{L}\p{N}])(?:quem\s+(?:é|e)\s+voc[êe]|o\s+que\s+voc[êe]\s+(?:faz|é|e|pode)|como\s+voc[êe]\s+funciona|para\s+que\s+voc[êe]\s+serve|o\s+que\s+(?:é|e)\s+(?:o\s+)?consbot|who\s+are\s+you|what\s+(?:can|do)\s+you\s+do|how\s+do\s+you\s+work)(?![\p{L}\p{N}])/iu;
+
+export function isSmallTalk(text: string): boolean {
+  return SMALL_TALK.test(text) || ABOUT_ASSISTANT.test(text);
 }
 
 function asDelivery(value: unknown): AgentDelivery {
@@ -65,22 +91,19 @@ function asDelivery(value: unknown): AgentDelivery {
  * Guarda só a última: o plano da pergunta anterior não serve para a nova.
  * De quebra, absorve o efeito montado duas vezes pelo StrictMode em dev.
  *
- * Sem AbortSignal de propósito — a promessa é compartilhada, e um cancelamento
- * de um interessado derrubaria o resultado para o outro. A chamada é curta;
- * quem perdeu o interesse simplesmente ignora o que chegar. */
+ * Nenhum interessado pode CANCELAR a chamada: a promessa é compartilhada, e um
+ * abort de um derrubaria o resultado do outro. Quem perdeu o interesse ignora
+ * o que chegar. O único sinal que a interrompe é o teto de espera interno
+ * (AGENT_PLANNER_TIMEOUT_MS), que vale para todos os interessados de uma vez. */
 let cached: { key: string; plan: Promise<AgentPlan> } | null = null;
 
 function cacheKey(ctx: AgentContext): string {
-  // A presença de histórico entra na chave porque muda o resultado: a mesma
-  // frase pode ser respondida pela triagem na primeira mensagem e precisar do
-  // modelo completo depois. Sem isso, o plano da primeira vez contaminaria as
-  // seguintes.
-  return [
-    ctx.userText.trim(),
-    ctx.settings.prompt,
-    ctx.host.english,
-    Boolean(ctx.assistantText),
-  ].join(" | ");
+  // Só o que muda o plano entra na chave. A presença de histórico ficava aqui
+  // enquanto `mayAnswer` dependia dela; agora quem autoriza a resposta direta
+  // é `isSmallTalk`, que olha só a mensagem — e o histórico fora da chave faz
+  // os dois interessados (triagem e barra de botões) caírem no mesmo plano com
+  // mais confiabilidade, que é a razão de o cache existir.
+  return [ctx.userText.trim(), ctx.settings.prompt, ctx.host.english].join(" | ");
 }
 
 /** Planejamento por LLM: uma chamada decide SE há ação, QUAL ferramenta, com
@@ -95,7 +118,17 @@ export function planAgent(ctx: AgentContext): Promise<AgentPlan> {
   const key = cacheKey(ctx);
   if (cached?.key === key) return cached.plan;
 
-  const plan = requestPlan(ctx);
+  const plan = requestPlan(ctx).then((result) => {
+    // Plano vazio POR FALHA não vira memória: a rede caiu ou o teto de espera
+    // estourou, e quem perguntar em seguida — a barra de botões, depois da
+    // resposta — merece uma tentativa nova em vez de herdar o silêncio.
+    if (result === FAILED) {
+      if (cached?.key === key) cached = null;
+      return EMPTY;
+    }
+    return result;
+  });
+
   cached = { key, plan };
   return plan;
 }
@@ -113,8 +146,17 @@ async function requestPlan(ctx: AgentContext): Promise<AgentPlan> {
     const response = await fetch(`${ctx.host.apiBase}/api/llm`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
+      // Sem isto, um servidor que aceita a conexão e não responde pendura a
+      // triagem — e com ela o envio da pergunta. Ver AGENT_PLANNER_TIMEOUT_MS.
+      signal: AbortSignal.timeout(AGENT_PLANNER_TIMEOUT_MS),
       body: JSON.stringify({
-        messages: [{ role: "user", content: `${instructions}\n\n---\n${text}` }],
+        // As instruções vão no systemPrompt, e não coladas na pergunta, porque
+        // são idênticas em toda classificação: nessa posição viram prefixo
+        // estável, que o cache de prompt da OpenAI aproveita. O
+        // `promptCacheKey` roteia as chamadas para o mesmo cache.
+        messages: [{ role: "user", content: text }],
+        systemPrompt: instructions,
+        promptCacheKey: `agent-planner-${english ? "en" : "pt"}`,
         model: AGENT_CLASSIFIER_MODEL,
         reasoningEffort: AGENT_CLASSIFIER_REASONING.id,
         verbosity: "low",
@@ -126,10 +168,10 @@ async function requestPlan(ctx: AgentContext): Promise<AgentPlan> {
       }),
     });
 
-    if (!response.ok) return EMPTY;
+    if (!response.ok) return FAILED;
 
     const result = (await response.json()) as { content?: string };
-    if (!result.content) return EMPTY;
+    if (!result.content) return FAILED;
 
     const parsed = JSON.parse(result.content) as PlannerPayload;
     const items = Array.isArray(parsed.actions) ? parsed.actions : [];
@@ -159,13 +201,17 @@ async function requestPlan(ctx: AgentContext): Promise<AgentPlan> {
     //  1. ela pediu `direct`;
     //  2. escreveu alguma coisa — um `direct` vazio mostraria resposta em
     //     branco, e sai mais barato pagar a chamada completa;
-    //  3. ou há ação (a busca É a resposta), ou a conversa ainda não começou.
+    //  3. ou há ação (a busca É a resposta), ou a mensagem é o caso (a) das
+    //     instruções — saudação, agradecimento, pergunta sobre o próprio
+    //     assistente —, reconhecido AQUI, por padrão, não pela palavra do
+    //     classificador.
     //
-    // A terceira fecha a classe de erro mais cara: a triagem não recebe o
-    // histórico, então responder sozinha «resuma o que conversamos» é
-    // impossível por construção. Havendo resposta anterior na thread, uma
-    // mensagem sem ação vai para o modelo completo, doa a quem doer.
-    const mayAnswer = actions.length > 0 || !ctx.assistantText;
+    // A terceira fecha a classe de erro mais cara: a triagem não recebe as
+    // fontes nem o histórico, então toda pergunta de conteúdo tem de ir ao
+    // modelo completo. Antes esta linha era `!ctx.assistantText`, o que
+    // protegia a conversa em andamento e deixava a PRIMEIRA mensagem
+    // descoberta — justamente o primeiro contato do usuário.
+    const mayAnswer = actions.length > 0 || isSmallTalk(text);
 
     return {
       actions,
@@ -174,6 +220,8 @@ async function requestPlan(ctx: AgentContext): Promise<AgentPlan> {
       answer,
     };
   } catch {
-    return EMPTY;
+    // Abort por teto de espera cai aqui junto com rede fora e JSON inesperado:
+    // para o usuário são a mesma coisa — nenhum botão, conversa intacta.
+    return FAILED;
   }
 }

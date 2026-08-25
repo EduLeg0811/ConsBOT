@@ -1,27 +1,31 @@
 /** Configuração do módulo AGENT (ações sugeridas).
  *
  * ─────────────────────────────────────────────────────────────────────────────
- *  AGENT_MODE — 0 (desligado, padrão) | 1 (ligado)
+ *  AGENT_MODE — 0 (desligado) | 1 (ligado, padrão)
  * ─────────────────────────────────────────────────────────────────────────────
  *
  *  LIGADO, o ConsBOT passa a exibir BOTÕES OPCIONAIS abaixo da conversa quando
- *  a pergunta do usuário casa com alguma regra de `src/lib/agent/rules.ts`.
+ *  a pergunta do usuário casa com alguma regra de `src/agent/planner/rules.ts`.
  *  Exemplo: pedido de busca literal ("localize a palavra 'consciex'") faz
  *  aparecer um botão que abre o módulo de busca em livros do Cons-ia.org.
  *
  *  O que este módulo NÃO faz — de propósito:
- *   - não altera o systemPrompt, o payload de /api/llm nem a resposta da LLM;
  *   - não executa nada sozinho: quem clica é o usuário, sempre.
  *
  *  Apesar do nome, não é um "modo agente" no sentido de tool calling — a LLM
- *  não decide nem executa ferramenta alguma. É detecção de intenção por regra
- *  determinística no cliente, com sugestão de ação. Ver README do módulo.     
+ *  não decide nem executa ferramenta alguma. É detecção de intenção com
+ *  sugestão de ação, por regra determinística no cliente ou por classificador.
+ *  O catálogo de intenções está em docs/agent-rules.docx.
+ *
+ *  A única exceção à regra de não interferir é o modo «Alimentar LLM», em que
+ *  o resultado da consulta é anexado ao systemPrompt daquele turno — ver
+ *  AGENT_LLM_MODES e planner/context.ts.
  *
  *  DESLIGADO (0), o módulo é inerte: <AgentActions /> devolve null e nenhuma
  *  regra é avaliada.
  *
  *  Este valor é apenas o PADRÃO da sessão: com ACCESS_LEVEL=1 o menu de
- *  configuração expõe um interruptor que o sobrescreve em `ChatSettings.agentMode`
+ *  configuração expõe um interruptor que o sobrescreve em `ChatSettings.agent`
  *  enquanto a aba estiver aberta (as settings não são persistidas — ver
  *  chat-store.ts). Fora do admin vale sempre o padrão calculado aqui.
  *
@@ -36,7 +40,7 @@
  */
 // Anotado como `number` de propósito: sem isso o TS trava o literal e acusa a
 // comparação `=== 1` como impossível quando o valor mudar.
-const AGENT_MODE_DEFAULT: number = 0;
+const AGENT_MODE_DEFAULT: number = 1;
 
 const agentModeOverride = String(import.meta.env.VITE_AGENT_MODE ?? "").trim();
 
@@ -71,15 +75,15 @@ const stripQuery = (url: string) => url.replace(/[?&]+$/, "");
 export const AGENT_TARGETS: Record<AgentIntentId, string> = {
   search_book: stripQuery(
     String(import.meta.env.VITE_SEARCH_BOOK_URL || "").trim() ||
-    "https://cons-ia.org/index_search_book.html",
+      "https://cons-ia.org/index_search_book.html",
   ),
   search_verbete: stripQuery(
     String(import.meta.env.VITE_SEARCH_VERBETE_URL || "").trim() ||
-    "https://cons-ia.org/index_search_verb.html",
+      "https://cons-ia.org/index_search_verb.html",
   ),
   bibliografia_livros: stripQuery(
     String(import.meta.env.VITE_BIBLIOGRAPHY_URL || "").trim() ||
-    "https://cons-ia.org/index_biblio_wv.html",
+      "https://cons-ia.org/index_biblio_wv.html",
   ),
   consulta_dicionarios: stripQuery(
     String(import.meta.env.VITE_LEXICONS_URL || "").trim() || "https://lexicons.cons-ia.org/",
@@ -90,7 +94,7 @@ export const AGENT_TARGETS: Record<AgentIntentId, string> = {
  *
  * Existe porque o endpoint `/api/lexical/verbetes/search` do Main-Server aceita
  * autor, título e especialidade separados — coisa que a página web não faz.
- * Vale, portanto, apenas no modo «Buscar aqui»; no modo link o campo é
+ * Vale, portanto, apenas no modo «Busca Integrada»; no modo link o campo é
  * ignorado, já que a URL só leva o termo. `""` = busca no texto (Definologia),
  * que é o padrão e o único caminho das demais intenções. */
 export const AGENT_VERBETE_FIELDS = ["", "titulo", "autor", "especialidade"] as const;
@@ -131,6 +135,20 @@ export type AgentDetectionId = (typeof AGENT_DETECTIONS)[number]["id"];
  * B, para quando o Main-Server estiver fora. */
 export const AGENT_DETECTION_DEFAULT: AgentDetectionId = "llm";
 
+/** Tetos de espera do módulo, em milissegundos.
+ *
+ * Existem porque `fetch` não tem timeout: sem eles, um Main-Server que aceita
+ * a conexão e não responde deixava a triagem pendurada — e, como a triagem
+ * roda ANTES do envio, a pergunta do usuário nunca saía. O `catch` do módulo
+ * já trata o abort como qualquer outra falha, então estourar o teto devolve
+ * bypass, que é o comportamento de sempre.
+ *
+ * O do planejador é mais curto de propósito: ele atrasa o envio da pergunta.
+ * O da consulta é maior porque busca em corpus grande demora mais, e nesse
+ * ponto o usuário já pediu explicitamente o dado. */
+export const AGENT_PLANNER_TIMEOUT_MS = 6000;
+export const AGENT_LOOKUP_TIMEOUT_MS = 8000;
+
 /** Modelo da classificação: o mais barato/rápido do catálogo, já que a tarefa
  * é rotular uma frase curta, não redigir. Mesmo usado nas sugestões iniciais. */
 export const AGENT_CLASSIFIER_MODEL = "gpt-5.6-luna";
@@ -141,13 +159,19 @@ export const AGENT_CLASSIFIER_MODEL = "gpt-5.6-luna";
  * `id` vai na requisição; `label` é o que o painel de configuração mostra. */
 export const AGENT_CLASSIFIER_REASONING = { id: "none", label: "None" } as const;
 
-/** No modo Classificador LLM, o que o botão faz.
+/** No modo Classificador LLM, o que o botão faz. Os nomes entre aspas são os
+ * rótulos da UI, e são o vocabulário canônico do módulo — comentário, painel
+ * e telemetria falam a mesma língua.
  *
- * `link` — PADRÃO. Abre o módulo externo em nova aba, levando o termo na URL.
- *          Não consulta nada: o custo é zero e o usuário decide para onde vai.
- * `api`  — Consulta o endpoint correspondente do Main-Server e mostra o
- *          resultado num card dentro da própria conversa, com um link discreto
- *          para o módulo completo. A consulta só acontece no clique.
+ * `link`    — «Abrir módulo». PADRÃO. Abre o módulo externo em nova aba,
+ *             levando o termo na URL. Não consulta nada: custo zero e o
+ *             usuário decide para onde vai.
+ * `api`     — «Busca Integrada». Consulta o endpoint correspondente do
+ *             Main-Server e mostra o resultado num card dentro da conversa,
+ *             com um link discreto para o módulo completo. Só no clique.
+ * `context` — «Alimentar LLM». Consulta ANTES de responder e anexa o
+ *             resultado ao systemPrompt daquele turno. É o único modo que
+ *             atrasa a resposta, e o único que interfere no prompt.
  *
  * Vale apenas para a detecção `llm`; em `rules` o botão é sempre link. */
 export const AGENT_LLM_MODES = [
@@ -194,9 +218,6 @@ export type AgentFullAnswerModeId = (typeof AGENT_FULL_ANSWER_MODES)[number]["id
 
 export const AGENT_FULL_ANSWER_DEFAULT: AgentFullAnswerModeId = "auto";
 
-/** Quantos resultados pedir ao Main-Server e quantos mostrar antes do
- * «ver mais». Buscar mais do que se mostra é o que permite expandir sem uma
- * segunda ida à rede. */
 /** Quem responde a mensagem — a decisão de porteiro da triagem.
  *
  * `direct`: a própria triagem responde, em `answer`. Só vale quando a
@@ -217,8 +238,13 @@ export type AgentAnswerMode = (typeof AGENT_ANSWER_MODES)[number];
 export const AGENT_ANSWER_MAX = 320;
 
 /** Como o planejador quer que o resultado chegue ao usuário. Só é consultado
- * no modo «Alimentar resposta»; nos outros dois quem decide é o modo. */
-export const AGENT_DELIVERIES = ["card", "context", "both"] as const;
+ * no modo «Alimentar LLM»; nos outros dois quem decide é o modo.
+ *
+ * Havia um terceiro valor, `both`, que o cliente tratava exatamente como
+ * `context` — o botão do card aparece nos dois casos de qualquer forma. Ele
+ * custava duas linhas de prompt em toda classificação para descrever uma
+ * distinção que ninguém lia; saiu. */
+export const AGENT_DELIVERIES = ["card", "context"] as const;
 
 export type AgentDelivery = (typeof AGENT_DELIVERIES)[number];
 
@@ -226,6 +252,12 @@ export type AgentDelivery = (typeof AGENT_DELIVERIES)[number];
  * que no card: aqui cada item custa token em toda pergunta que buscar. */
 export const AGENT_CONTEXT_ITEMS = 6;
 
+/** Quantos resultados pedir ao Main-Server e quantos mostrar antes do
+ * «ver mais». Buscar mais do que se mostra é o que permite expandir sem uma
+ * segunda ida à rede.
+ *
+ * `AGENT_SEARCH_LIMIT` é também o sinal de saturação do card: um lote cheio
+ * quer dizer «havia pelo menos isto», não «havia exatamente isto». */
 export const AGENT_SEARCH_LIMIT = 12;
 export const AGENT_CARD_PREVIEW = 5;
 

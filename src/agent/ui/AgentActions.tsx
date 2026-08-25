@@ -54,9 +54,9 @@ type Props = {
 
 /** Botões opcionais de ação sugerida (módulo AGENT).
  *
- * Com `settings.agentMode` desligado devolve null antes de qualquer trabalho —
+ * Com `settings.enabled` desligado devolve null antes de qualquer trabalho —
  * é por isso que o ChatWindow pode montar este componente incondicionalmente,
- * sem `if`. O padrão de `agentMode` vem de AGENT_MODE (ver agent/config.ts).
+ * sem `if`. O padrão de `enabled` vem de AGENT_MODE (ver agent/config.ts).
  */
 export function AgentActions({
   threadId,
@@ -74,7 +74,7 @@ export function AgentActions({
   const enabled = settings.enabled;
   const detection = settings.detection;
   // O botão abre o card em vez de outra aba nos dois modos que consultam a
-  // API. Em «Alimentar resposta» a consulta já aconteceu antes da resposta,
+  // API. Em «Alimentar LLM» a consulta já aconteceu antes da resposta,
   // e o botão serve para VER o que alimentou — sem repetir a busca.
   // Sob a detecção por Regras o botão é sempre link.
   const cardMode = detection === "llm" && settings.action !== "link";
@@ -104,11 +104,32 @@ export function AgentActions({
   const [llmActions, setLlmActions] = useState<AgentAction[]>([]);
   const [cards, setCards] = useState<Record<string, CardState>>({});
 
+  // O marco da mensagem em curso, também em ref: as promessas de busca
+  // precisam saber, quando voltarem, se ainda estão falando da mesma pergunta.
+  const userKeyRef = useRef<string | null>(currentUserKey);
+  // Buscas em voo desta mensagem, para cancelar quando ela deixar de ser a
+  // atual. Sem isto, o resultado chegava depois da troca e o card da pergunta
+  // anterior aparecia embaixo da nova.
+  const inFlightRef = useRef(new Map<AgentIntentId, AbortController>());
+
   if (currentUserKey !== prevUserKey) {
     setPrevUserKey(currentUserKey);
     setLlmActions([]);
     setCards({});
+    userKeyRef.current = currentUserKey;
+    for (const controller of inFlightRef.current.values()) controller.abort();
+    inFlightRef.current.clear();
   }
+
+  // Sair da tela cancela o que ficou em voo — nenhuma resposta a caminho de um
+  // componente desmontado.
+  useEffect(() => {
+    const inFlight = inFlightRef.current;
+    return () => {
+      for (const controller of inFlight.values()) controller.abort();
+      inFlight.clear();
+    };
+  }, []);
 
   useEffect(() => {
     if (!enabled || detection !== "llm" || !user?.id) {
@@ -116,9 +137,9 @@ export function AgentActions({
       return;
     }
 
-    // Um plano por mensagem do usuário. `planAgent` guarda o último, então
-    // quando o modo «Alimentar resposta» já planejou antes de responder,
-    // isto reaproveita — e não custa uma segunda chamada.
+    // Um plano por mensagem do usuário. `planAgent` guarda o último, e é o
+    // mesmo que a triagem já pediu antes do envio — aqui só se colhe o
+    // resultado, sem uma segunda chamada.
     let current = true;
     void planAgent(ctxRef.current).then((plan) => {
       if (current) setLlmActions(plan.actions);
@@ -129,8 +150,9 @@ export function AgentActions({
     };
   }, [enabled, detection, user?.id, user?.text]);
 
-  // Cada mensagem começa sem cards: o resultado da anterior não vale para a
-  // pergunta nova. Vivem só na sessão, como as settings.
+  // Trocar o modo de ação invalida os cards abertos: o botão passou a
+  // prometer outra coisa. (Quem zera a cada mensagem é o bloco do marco,
+  // acima — este efeito cuida só da troca de modo.)
   useEffect(() => {
     setCards({});
   }, [cardMode]);
@@ -145,9 +167,9 @@ export function AgentActions({
 
   const runSearch = useCallback(
     (action: AgentAction) => {
-      // No modo «Alimentar resposta» esta consulta já foi feita antes da
-      // resposta; então o card abre na hora, sem ir à rede de novo.
-      const known = recallCard(action);
+      // No modo «Alimentar LLM» esta consulta já foi feita antes da resposta;
+      // então o card abre na hora, sem ir à rede de novo.
+      const known = recallCard(action, ctxRef.current);
       if (known) {
         setCards((current) => ({
           ...current,
@@ -164,25 +186,41 @@ export function AgentActions({
 
       host.logEvent({ intent: action.id, via: "api", detection, meta: action.meta });
 
-      void executeAgentAction(action, ctxRef.current)
-        .then((card) =>
-          setCards((current) => ({
-            ...current,
-            [action.id]: { loading: false, error: null, card },
-          })),
-        )
-        .catch(() =>
-          setCards((current) => ({
-            ...current,
-            [action.id]: {
-              loading: false,
-              card: null,
-              error: english
-                ? "Could not reach the search service."
-                : "Não foi possível consultar o serviço de busca.",
-            },
-          })),
-        );
+      // O marco da pergunta que originou ESTA busca. Quando a resposta voltar,
+      // só entra na tela se ainda for a pergunta em curso.
+      const key = userKeyRef.current;
+      const controller = new AbortController();
+      inFlightRef.current.get(action.id)?.abort();
+      inFlightRef.current.set(action.id, controller);
+
+      const settle = (state: CardState) => {
+        if (inFlightRef.current.get(action.id) === controller) {
+          inFlightRef.current.delete(action.id);
+        }
+        if (userKeyRef.current !== key) return;
+        setCards((current) => ({ ...current, [action.id]: state }));
+      };
+
+      void executeAgentAction(action, ctxRef.current, controller.signal)
+        .then((card) => settle({ loading: false, error: null, card }))
+        .catch(() => {
+          // Abortada — ou a pergunta mudou (e o reset do marco já limpou a
+          // tela), ou um clique novo tomou o lugar deste. Nos dois casos quem
+          // manda na tela é outro, e escrever aqui apagaria o trabalho dele.
+          if (controller.signal.aborted) {
+            if (inFlightRef.current.get(action.id) === controller) {
+              inFlightRef.current.delete(action.id);
+            }
+            return;
+          }
+          settle({
+            loading: false,
+            card: null,
+            error: english
+              ? "Could not reach the search service."
+              : "Não foi possível consultar o serviço de busca.",
+          });
+        });
     },
     [detection, english, host],
   );

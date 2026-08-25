@@ -9,10 +9,13 @@ const STATUS_DETECTION_LABELS: Record<string, string> = {
   llm: "LLM",
 };
 
+/** Formas curtas dos rótulos canônicos de AGENT_LLM_MODES — «Abrir módulo»,
+ * «Busca Integrada», «Alimentar LLM» —, para a linha caber ao lado do status
+ * do RAG sem inventar um terceiro vocabulário para os mesmos três modos. */
 const STATUS_ACTION_LABELS: Record<string, string> = {
-  link: "Open",
-  api: "Card",
-  context: "Appended",
+  link: "Abrir",
+  api: "Busca",
+  context: "Alimentar",
 };
 
 /** Linha de parâmetros do módulo, ao lado do eco da pergunta.

@@ -1,5 +1,5 @@
 import { AGENT_BOOK_IDS, AGENT_SEARCH_LIMIT, AGENT_TARGETS, agentBookLabel } from "@/agent/config";
-import { asArray, asRecord, href, markdown, plain, post } from "@/agent/tools/lib/api";
+import { asArray, asRecord, href, markdown, post } from "@/agent/tools/lib/api";
 import {
   BIBLIO_CONTEXT,
   BOOK_TARGET,
@@ -91,6 +91,15 @@ export const searchBook: AgentTool = {
       return { source: `${String(row.source ?? "")}${page}`, snippet: markdown(row.text) };
     });
 
-    return { intent: "search_book", term, total: items.length, items };
+    // `/search/multi` devolve `count = len(results)`, ou seja, o tamanho do
+    // lote — não há total de corpus a informar. Lote cheio significa «pelo
+    // menos isto», e é o card que dá a notícia.
+    return {
+      intent: "search_book",
+      term,
+      total: items.length,
+      saturated: items.length >= AGENT_SEARCH_LIMIT,
+      items,
+    };
   },
 };

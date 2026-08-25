@@ -54,6 +54,7 @@ async function loadPlanner() {
       'export { agentInstructionsFor } from "@/agent/planner/prompt";',
       'export { AGENT_PLANNER_SCHEMA } from "@/agent/planner/schema";',
       'export { AGENT_TOOLS } from "@/agent/tools/registry";',
+      'export { isSmallTalk } from "@/agent/planner/plan";',
     ].join("\n"),
   );
 
@@ -82,12 +83,17 @@ async function loadPlanner() {
   return { planner, cleanup: () => rm(dir, { recursive: true, force: true }) };
 }
 
-async function classify(instructions, schema, question) {
+async function classify(instructions, schema, question, isSmallTalk) {
   const response = await fetch(`${API_BASE}/api/llm`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      messages: [{ role: "user", content: `${instructions}\n\n---\n${question}` }],
+      // Mesma forma de requisição que `planner/plan.ts` usa: instruções no
+      // systemPrompt, pergunta sozinha na mensagem. A suíte só vale enquanto
+      // medir o que o app manda.
+      messages: [{ role: "user", content: question }],
+      systemPrompt: instructions,
+      promptCacheKey: "agent-planner-pt",
       model: MODEL,
       reasoningEffort: "none",
       verbosity: "low",
@@ -102,11 +108,20 @@ async function classify(instructions, schema, question) {
   const parsed = JSON.parse(content ?? "{}");
   const actions = Array.isArray(parsed.actions) ? parsed.actions : [];
 
+  // A MESMA trava que `planner/plan.ts` aplica antes de aceitar um `direct`:
+  // sem ação e sem ser saudação, a resposta vai ao modelo completo, diga o
+  // classificador o que disser. Medir o `answer_mode` cru sem ela reportava
+  // como «engolida» uma pergunta que o app manda para o modelo completo.
+  const answer = String(parsed.answer ?? "").trim();
+  const mayAnswer = actions.length > 0 || isSmallTalk(question);
+  const mode = parsed.answer_mode === "direct" && answer && mayAnswer ? "direct" : "full";
+
   return {
     intents: actions.map((a) => a.intent).filter(Boolean),
     delivery: parsed.delivery ?? "—",
-    mode: parsed.answer_mode ?? "—",
-    answer: parsed.answer ?? "",
+    mode,
+    rawMode: parsed.answer_mode ?? "—",
+    answer,
     args: actions.map((a) => ({ term: a.term, field: a.field || "", book: a.book || "" })),
   };
 }
@@ -155,7 +170,7 @@ async function main() {
     const runs = [];
     for (let i = 0; i < RUNS; i += 1) {
       try {
-        runs.push(await classify(instructions, schema, testCase.q));
+        runs.push(await classify(instructions, schema, testCase.q, planner.isSmallTalk));
       } catch (error) {
         runs.push({ intents: ["<erro>"], delivery: "—", args: [], error: String(error.message) });
       }
@@ -238,23 +253,23 @@ async function main() {
   for (const row of desperdicio) console.log(`     ${row.testCase.q}`);
 
   /* ── risco de latência: com que frequência o planejador pede `context` ──
-   * Só importa no modo «Alimentar resposta», onde `context` significa buscar
+   * Só importa no modo «Alimentar LLM», onde `context` significa buscar
    * ANTES de responder. Pedir context onde não há ação é inofensivo; pedir em
    * pergunta comum COM ação é o que atrasa a conversa à toa. */
   const wanted = rows.flatMap((r) => r.runs.filter((run) => run.intents.length > 0));
-  const asContext = wanted.filter((run) => run.delivery === "context" || run.delivery === "both");
+  const asContext = wanted.filter((run) => run.delivery === "context");
   const noise = rows
     .filter((r) => r.testCase.expect.length === 0)
     .flatMap((r) => r.runs)
     .filter((run) => run.intents.length > 0);
 
   console.log(`\nEntrega, quando há ação:`);
-  for (const kind of ["card", "context", "both"]) {
+  for (const kind of ["card", "context"]) {
     const n = wanted.filter((run) => run.delivery === kind).length;
     console.log(`  ${kind.padEnd(10)} ${String(n).padStart(3)}  ${pct(n, wanted.length)}`);
   }
   console.log(
-    `  → ${pct(asContext.length, wanted.length)} das ações atrasariam a resposta no modo «Alimentar resposta»`,
+    `  → ${pct(asContext.length, wanted.length)} das ações atrasariam a resposta no modo «Alimentar LLM»`,
   );
   console.log(
     `\nAções indevidas (casos que não deviam disparar): ${noise.length} em ${rows.filter((r) => r.testCase.expect.length === 0).length * RUNS} execuções`,

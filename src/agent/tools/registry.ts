@@ -55,7 +55,7 @@ export function actionsFromMatches(matches: AgentMatch[], ctx: AgentContext): Ag
   return actions;
 }
 
-/** Executa a consulta da ferramenta correspondente (modo «Buscar aqui»).
+/** Executa a consulta da ferramenta correspondente (modo «Busca Integrada»).
  *
  * Diferente do planejamento, aqui o erro SOBE: a consulta é resposta a um
  * clique, e engolir a falha deixaria o usuário olhando para um botão que não
@@ -75,7 +75,7 @@ export function executeAgentAction(action: AgentAction, ctx: AgentContext, signa
 }
 
 /* ───────────────────────── resultados já buscados ───────────────────────────
- * No modo «Alimentar resposta» a consulta acontece ANTES da resposta, e o
+ * No modo «Alimentar LLM» a consulta acontece ANTES da resposta, e o
  * botão do card continua disponível depois. Sem esta memória, clicar nele
  * repetiria uma consulta que já foi feita segundos antes.
  *
@@ -85,16 +85,19 @@ export function executeAgentAction(action: AgentAction, ctx: AgentContext, signa
 const RECENT_LIMIT = 4;
 const recent = new Map<string, AgentCard>();
 
-function cardKey(action: AgentAction): string {
+function cardKey(action: AgentAction, ctx: AgentContext): string {
   const { term = "", field = "", book = "" } = action.meta ?? {};
-  return `${action.id}:${term}:${field}:${book}`;
+  // O thread entra na chave porque esta memória serve à MENSAGEM em curso, não
+  // ao corpus: sem ele, uma conversa servia o resultado guardado por outra, e
+  // o card aparecia pronto para uma busca que aquela conversa nunca fez.
+  return `${ctx.threadId}:${action.id}:${term}:${field}:${book}`;
 }
 
-export function rememberCard(action: AgentAction, card: AgentCard): void {
+export function rememberCard(action: AgentAction, ctx: AgentContext, card: AgentCard): void {
   if (recent.size >= RECENT_LIMIT) recent.delete(recent.keys().next().value as string);
-  recent.set(cardKey(action), card);
+  recent.set(cardKey(action, ctx), card);
 }
 
-export function recallCard(action: AgentAction): AgentCard | undefined {
-  return recent.get(cardKey(action));
+export function recallCard(action: AgentAction, ctx: AgentContext): AgentCard | undefined {
+  return recent.get(cardKey(action, ctx));
 }
