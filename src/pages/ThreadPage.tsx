@@ -119,16 +119,16 @@ export function ThreadPage() {
     ? isAdmin
       ? active.settings
       : // Fora do admin o painel expõe apenas formato, verbosidade e base RAG;
-        // todo o resto vem do padrão. O prompt continua sendo o canônico do
-        // formato — não há como customizá-lo aqui, então nunca uma cópia
-        // antiga da thread.
-        {
-          ...DEFAULT_SETTINGS,
-          responseFormat: active.settings.responseFormat,
-          systemPrompt: systemPromptForFormat(active.settings.responseFormat),
-          textVerbosity: active.settings.textVerbosity,
-          vectorStoreId: allowedVectorStoreId(active.settings.vectorStoreId, false),
-        }
+      // todo o resto vem do padrão. O prompt continua sendo o canônico do
+      // formato — não há como customizá-lo aqui, então nunca uma cópia
+      // antiga da thread.
+      {
+        ...DEFAULT_SETTINGS,
+        responseFormat: active.settings.responseFormat,
+        systemPrompt: systemPromptForFormat(active.settings.responseFormat),
+        textVerbosity: active.settings.textVerbosity,
+        vectorStoreId: allowedVectorStoreId(active.settings.vectorStoreId, false),
+      }
     : DEFAULT_SETTINGS;
 
   const goTo = (id: string) => setActiveId(id);
@@ -183,12 +183,12 @@ export function ThreadPage() {
     const nextSettings = isAdmin
       ? settings
       : {
-          ...DEFAULT_SETTINGS,
-          responseFormat: settings.responseFormat,
-          systemPrompt: systemPromptForFormat(settings.responseFormat),
-          textVerbosity: settings.textVerbosity,
-          vectorStoreId: allowedVectorStoreId(settings.vectorStoreId, false),
-        };
+        ...DEFAULT_SETTINGS,
+        responseFormat: settings.responseFormat,
+        systemPrompt: systemPromptForFormat(settings.responseFormat),
+        textVerbosity: settings.textVerbosity,
+        vectorStoreId: allowedVectorStoreId(settings.vectorStoreId, false),
+      };
     persist(
       upsertThread(threads ?? [], {
         ...active,
@@ -306,7 +306,7 @@ export function ThreadPage() {
               />
               <span className="flex min-w-0 items-center gap-2">
                 <h1 className="max-w-[14rem] truncate font-nunito text-[1.35rem] font-normal tracking-tight text-foreground sm:max-w-none">
-                  Cons<em className="ml-[4px] italic text-primary font-semibold">BOT</em>
+                  Cons<em className="ml-[3px] italic text-primary font-semibold">BOT</em>
                 </h1>
 
                 <span className="hidden h-4 w-px bg-border sm:inline mx-1" />
