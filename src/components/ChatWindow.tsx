@@ -59,6 +59,9 @@ const VERBOSITY_LABELS: Record<ChatSettings["textVerbosity"], string> = {
   high: "Alto",
 };
 
+/** Limite máximo de caracteres por prompt enviado no chat */
+export const MAX_PROMPT_LENGTH = 4000;
+
 // Schema JSON-Schema estrito para o /api/llm gerar as sugestões — o
 // equivalente do zod suggestionItemSchema que a antiga função /api/suggestions
 // usava com generateObject. min/maxLength e minItems/maxItems são um reforço;
@@ -281,6 +284,7 @@ export function ChatWindow({
     ),
   );
   const [input, setInput] = useState("");
+  const isOverLimit = input.length > MAX_PROMPT_LENGTH;
   const [hasTyped, setHasTyped] = useState(() => initialMessages.length > 0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isRefreshingSuggestions, setIsRefreshingSuggestions] = useState(false);
@@ -539,6 +543,15 @@ export function ChatWindow({
       // segundo envio nesse intervalo abria uma rodada paralela — dois ecos,
       // duas chamadas, e os refs da primeira sobrescritos pela segunda.
       if (!value || isBusy || submittingRef.current) return;
+      if (value.length > MAX_PROMPT_LENGTH) {
+        const isEng = isEnglishVectorStore(settingsRef.current.vectorStoreId);
+        toast.error(
+          isEng
+            ? `Message is too long (${value.length.toLocaleString()} chars). Maximum limit is ${MAX_PROMPT_LENGTH.toLocaleString()} characters.`
+            : `O texto é muito longo (${value.length.toLocaleString()} caracteres). O limite máximo é de ${MAX_PROMPT_LENGTH.toLocaleString()} caracteres.`,
+        );
+        return;
+      }
       submittingRef.current = true;
       setIsPreparing(true);
       try {
@@ -1207,16 +1220,33 @@ export function ChatWindow({
           className="[&_[data-slot=input-group]]:rounded-[28px] [&_[data-slot=input-group]]:border-border/70 [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-[0_3px_14px_-5px_oklch(0.3_0.02_155/0.22)]"
           onSubmit={(message, event) => {
             event.preventDefault();
-            void submit(message.text || input);
+            const text = (message.text || input).trim();
+            if (text.length > MAX_PROMPT_LENGTH) {
+              toast.error(
+                isEnglish
+                  ? `Message is too long (${text.length.toLocaleString()} chars). Maximum limit is ${MAX_PROMPT_LENGTH.toLocaleString()} characters.`
+                  : `O texto é muito longo (${text.length.toLocaleString()} caracteres). O limite máximo é de ${MAX_PROMPT_LENGTH.toLocaleString()} caracteres.`,
+              );
+              return;
+            }
+            void submit(text);
           }}
         >
           <PromptInputTextarea
             ref={textareaRef}
             value={input}
             onChange={(event) => {
-              setInput(event.target.value);
-              if (!hasTyped && event.target.value.length > 0) {
+              const val = event.target.value;
+              setInput(val);
+              if (!hasTyped && val.length > 0) {
                 setHasTyped(true);
+              }
+              if (val.length > MAX_PROMPT_LENGTH && input.length <= MAX_PROMPT_LENGTH) {
+                toast.warning(
+                  isEnglish
+                    ? `Text exceeds the ${MAX_PROMPT_LENGTH.toLocaleString()} character limit. Please shorten your prompt.`
+                    : `O texto excede o limite de ${MAX_PROMPT_LENGTH.toLocaleString()} caracteres. Por favor, reduza o conteúdo.`,
+                );
               }
             }}
             className="field-sizing-content max-h-48 min-h-14 resize-none bg-transparent px-5 py-4 text-base font-chat"
@@ -1235,7 +1265,7 @@ export function ChatWindow({
           <div className="flex shrink-0 items-center pr-2">
             <PromptInputSubmit
               status={status}
-              disabled={!isBusy && (isPreparing || input.trim().length === 0)}
+              disabled={!isBusy && (isPreparing || input.trim().length === 0 || isOverLimit)}
               onClick={isBusy ? stopWithAudit : undefined}
               className="size-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/35 disabled:text-primary-foreground"
             >
@@ -1243,9 +1273,27 @@ export function ChatWindow({
             </PromptInputSubmit>
           </div>
         </PromptInput>
-        <p className="mt-2 pr-2 text-right text-[11px] leading-relaxed text-muted-foreground/60 sm:leading-none">
-          {llmParameters.join("  ●  ")}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-2 text-[11px] text-muted-foreground/60">
+          <div>
+            {input.length > MAX_PROMPT_LENGTH * 0.7 ? (
+              <span
+                className={
+                  isOverLimit
+                    ? "font-semibold text-destructive"
+                    : "text-muted-foreground"
+                }
+              >
+                {input.length.toLocaleString()} / {MAX_PROMPT_LENGTH.toLocaleString()}{" "}
+                {isEnglish ? "characters" : "caracteres"}
+                {isOverLimit &&
+                  (isEnglish ? " (limit exceeded)" : " (limite excedido)")}
+              </span>
+            ) : null}
+          </div>
+          <p className="ml-auto text-right leading-relaxed sm:leading-none">
+            {llmParameters.join("  ●  ")}
+          </p>
+        </div>
       </div>
     </main>
   );
