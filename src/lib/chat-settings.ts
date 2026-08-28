@@ -196,7 +196,7 @@ export function withResponseFormat<T extends ChatSettings>(
 }
 
 export const DEFAULT_SETTINGS: ChatSettings = {
-  model: "gpt-5.6-terra",
+  model: "gpt-5.6-sol",
   vectorStoreId: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
   responseFormat: "conscienciological",
   systemPrompt: CONSCIENTIOLOGICAL_SYSTEM_PROMPT,
