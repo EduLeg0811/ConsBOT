@@ -57,6 +57,7 @@ export const AGENT_INTENTS = [
   "search_book",
   "search_verbete",
   "bibliografia_livros",
+  "bibliografia_verbetes",
   "consulta_dicionarios",
 ] as const;
 
@@ -84,6 +85,10 @@ export const AGENT_TARGETS: Record<AgentIntentId, string> = {
   bibliografia_livros: stripQuery(
     String(import.meta.env.VITE_BIBLIOGRAPHY_URL || "").trim() ||
       "https://cons-ia.org/index_biblio_wv.html",
+  ),
+  bibliografia_verbetes: stripQuery(
+    String(import.meta.env.VITE_BIBLIOGRAPHY_VERBETE_URL || "").trim() ||
+      "https://cons-ia.org/index_biblio_verbete.html",
   ),
   consulta_dicionarios: stripQuery(
     String(import.meta.env.VITE_LEXICONS_URL || "").trim() || "https://lexicons.cons-ia.org/",

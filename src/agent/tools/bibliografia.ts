@@ -1,6 +1,13 @@
 import { AGENT_TARGETS } from "@/agent/config";
 import { asArray, asRecord, get, href, markdown, plain, post } from "@/agent/tools/lib/api";
-import { cleanTerm, isUsableTerm, QUOTED_TERM } from "@/agent/tools/lib/text";
+import {
+  BOOK_TARGET,
+  cleanTerm,
+  detectBook,
+  isUsableTerm,
+  QUOTED_TERM,
+  VERBETE_TARGET,
+} from "@/agent/tools/lib/text";
 import type { AgentCardItem, AgentTool } from "@/agent/types";
 
 /** Âncoras de pedido bibliográfico. «citar» sozinho não entra — casaria com
@@ -40,11 +47,16 @@ export const bibliografia: AgentTool = {
 
   describe: (english) =>
     english
-      ? "bibliografia_livros — the user asks for the bibliography, the bibliographic reference, or how to CITE a book. Do NOT use it when they want the book's content, summary or analysis, where to buy it, or a literal search inside it. term holds the book title; leave term empty when the request is generic, with no identifiable title."
-      : "bibliografia_livros — o usuário pede a bibliografia, a referência bibliográfica ou como CITAR um livro (BEE). NÃO use quando ele quer o conteúdo, o resumo, a análise do livro, onde comprá-lo, ou uma busca literal dentro dele. Em term vai o título do livro; deixe term vazio quando o pedido for genérico, sem título identificável.",
+      ? "bibliografia_livros — the user asks for the bibliography, the bibliographic reference, or how to CITE a book (BEE). Do NOT use it for verbetes (use bibliografia_verbetes instead), when they want the book's content, summary or analysis, where to buy it, or a literal search inside it. term holds the book title; leave term empty when the request is generic, with no identifiable title."
+      : "bibliografia_livros — o usuário pede a bibliografia, a referência bibliográfica ou como CITAR um livro (BEE). NÃO use para verbetes (use bibliografia_verbetes), quando ele quer o conteúdo, o resumo, a análise do livro, onde comprá-lo, ou uma busca literal dentro dele. Em term vai o título do livro; deixe term vazio quando o pedido for genérico, sem título identificável.",
 
   rule: ({ userText }) => {
     if (!BIBLIO_INTENT.test(userText)) return null;
+
+    // Se o pedido for especificamente sobre verbetes e não citar livros, deixa para bibliografia_verbetes
+    const isVerbete = VERBETE_TARGET.test(userText);
+    const isBook = BOOK_TARGET.test(userText) || Boolean(detectBook(userText, ""));
+    if (isVerbete && !isBook) return null;
 
     return { intent: "bibliografia_livros", term: bookTitle(userText) };
   },

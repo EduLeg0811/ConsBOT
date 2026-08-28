@@ -1,4 +1,5 @@
 import { bibliografia } from "@/agent/tools/bibliografia";
+import { bibliografiaVerbetes } from "@/agent/tools/bibliografia-verbetes";
 import { dicionarios } from "@/agent/tools/dicionarios";
 import { searchBook } from "@/agent/tools/search-book";
 import { searchVerbete } from "@/agent/tools/search-verbete";
@@ -20,7 +21,13 @@ import type {
  *
  * A ORDEM importa em dois pontos: é a ordem de avaliação das regras e, em
  * empate, a ordem em que os botões aparecem. */
-export const AGENT_TOOLS: AgentTool[] = [searchBook, searchVerbete, bibliografia, dicionarios];
+export const AGENT_TOOLS: AgentTool[] = [
+  searchBook,
+  searchVerbete,
+  bibliografia,
+  bibliografiaVerbetes,
+  dicionarios,
+];
 
 export function agentTool(name: string): AgentTool | undefined {
   return AGENT_TOOLS.find((tool) => tool.name === name);
