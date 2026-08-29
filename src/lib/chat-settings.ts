@@ -288,19 +288,6 @@ export function allowedVectorStoreId(id: VectorStoreId, isAdmin: boolean): Vecto
     : DEFAULT_SETTINGS.vectorStoreId;
 }
 
-/** Linha de extensão anexada ao prompt conforme a verbosidade escolhida.
- *
- * `verbosity` sozinho é uma dica de estilo da Responses API, sem teto de
- * tamanho; estas linhas dão o limite explícito em parágrafos. */
-export const VERBOSITY_INSTRUCTIONS: Record<TextVerbosity, string> = {
-  low: "Seja conciso: responda apenas com o necessário para resolver adequadamente a consulta, sem omitir ressalvas essenciais.",
-
-  medium:
-    "Desenvolva a resposta na medida necessária para explicar bem o tema, incluindo contexto e detalhes relevantes, sem repetições desnecessárias.",
-
-  high: "Desenvolva a resposta com maior profundidade, incluindo distinções, justificativas e detalhes relevantes, sem repetição ou conteúdo de preenchimento.",
-};
-
 export const ENGLISH_STORE_INSTRUCTION =
   "Always reply in British English, including titles of sections and items, unless the user explicitly requests otherwise. Always employ the specific terminology of Conscientiology in English, as they appear in the provided sources (for example: 'thosene' instead of 'pensene'; 'penta' instead of 'tenepes').";
 
@@ -314,7 +301,7 @@ export function isEnglishVectorStore(vectorStoreId?: VectorStoreId | null): bool
 }
 
 /** O `systemPrompt` que vai na requisição: o da conversa mais as instruções
- *  dinâmicas (base em inglês, verbosidade).
+ *  dinâmicas (base em inglês, perfil).
  *
  * Montado no envio, e não gravado na thread, por dois motivos: o admin veria a
  * linha surgir sozinha no textarea do prompt, e trocar de parâmetros
@@ -330,11 +317,6 @@ export function systemPromptWithVerbosity(settings: ChatSettings) {
   const profileInstruction = PROFILE_INSTRUCTIONS[profileId];
   if (profileInstruction) {
     prompt = prompt ? `${prompt}\n\n${profileInstruction}` : profileInstruction;
-  }
-
-  const instruction = VERBOSITY_INSTRUCTIONS[settings.textVerbosity];
-  if (instruction) {
-    prompt = prompt ? `${prompt}\n\n${instruction}` : instruction;
   }
 
   return prompt;
