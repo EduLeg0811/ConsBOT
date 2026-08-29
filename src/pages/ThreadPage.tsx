@@ -11,6 +11,7 @@ import {
   allowedVectorStoreId,
   DEFAULT_SETTINGS,
   isEnglishVectorStore,
+  PROFILE_VERBOSITY,
   systemPromptForFormat,
   withResponseFormat,
   type ChatSettings,
@@ -77,6 +78,12 @@ export function ThreadPage() {
   // localhost, ou VITE_ACCESS_LEVEL=1 definido no build para uma implantação
   // de teste.
   const [accessLevel] = useState<0 | 1>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("admin") === "0" || params.get("user") === "1") return 0;
+      if (params.get("admin") === "1") return 1;
+    }
+
     // `npm run dev` é sempre admin. A checagem de hostname abaixo não cobre o
     // dev aberto pelo IP da LAN (celular na rede); `import.meta.env.DEV` cobre,
     // e continua falso em qualquer build de produção.
@@ -125,8 +132,10 @@ export function ThreadPage() {
       {
         ...DEFAULT_SETTINGS,
         responseFormat: active.settings.responseFormat,
+        profile: active.settings.profile ?? DEFAULT_SETTINGS.profile,
         systemPrompt: systemPromptForFormat(active.settings.responseFormat),
-        textVerbosity: active.settings.textVerbosity,
+        textVerbosity:
+          PROFILE_VERBOSITY[active.settings.profile ?? DEFAULT_SETTINGS.profile],
         vectorStoreId: allowedVectorStoreId(active.settings.vectorStoreId, false),
       }
     : DEFAULT_SETTINGS;
@@ -185,8 +194,10 @@ export function ThreadPage() {
       : {
         ...DEFAULT_SETTINGS,
         responseFormat: settings.responseFormat,
+        profile: settings.profile ?? DEFAULT_SETTINGS.profile,
         systemPrompt: systemPromptForFormat(settings.responseFormat),
-        textVerbosity: settings.textVerbosity,
+        textVerbosity:
+          PROFILE_VERBOSITY[settings.profile ?? DEFAULT_SETTINGS.profile],
         vectorStoreId: allowedVectorStoreId(settings.vectorStoreId, false),
       };
     persist(

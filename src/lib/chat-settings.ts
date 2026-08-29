@@ -72,6 +72,40 @@ export const RESPONSE_FORMATS = [
 export type ResponseFormatId = (typeof RESPONSE_FORMATS)[number]["id"];
 export type TextVerbosity = "low" | "medium" | "high";
 
+export const PROFILES = [
+  { id: "preceptor", label: "Preceptor", description: "Direto e objetivo" },
+  { id: "tutor", label: "Tutor", description: "Explicativo e cordial" },
+  { id: "escritor", label: "Escritor", description: "Texto longo e detalhado" },
+  { id: "introdutor", label: "Introdutor", description: "Simples sem neologismos" },
+] as const;
+
+export type ProfileId = (typeof PROFILES)[number]["id"];
+
+export const PROFILE_INSTRUCTIONS: Record<ProfileId, string> = {
+  preceptor:
+    "Adote o perfil de preceptor: Seja firme, direto e prático. Não bajule o usuário. Priorize correções, decisões e próximos passos; apresente somente a justificativa necessária. Aponte equívocos com respeito e sem rodeios. Evite introduções genéricas, elogios, repetição e digressões.",
+  tutor:
+    "Adote o perfil de tutor: ensine com clareza, paciência e cordialidade. Parta do nível demonstrado pelo usuário e organize a explicação do básico ao mais elaborado, tornando explícitas as relações entre os conceitos. Defina termos quando necessário e use exemplos ou analogias para facilitar a compreensão. Antecipe dúvidas prováveis sem perder o foco.",
+  escritor:
+    "Adote o perfil de escritor: produza um texto desenvolvido, coeso e bem articulado, com progressão lógica entre as ideias. Aprofunde o contexto, as nuances, as relações e as implicações relevantes. Use transições naturais e privilegie parágrafos completos, recorrendo a listas numeradas (01., 02. etc.) para aumentarem a clareza. Evite redundância, floreio vazio e alongamento artificial. Não limite o tamanho da resposta, aprofunde conforme a necessidade do tema.",
+  introdutor:
+    "Adote o perfil de introdutor: explique para quem está começando, com linguagem simples, concreta e acolhedora. Apresente primeiro a ideia central e avance do básico ao essencial em etapas curtas. Evite jargão e neologismos próprios da Conscienciologia; quando um termo técnico for indispensável, defina-o imediatamente em palavras comuns. Use exemplos cotidianos quando ajudarem e não pressuponha conhecimento prévio.",
+};
+
+export const PROFILE_VERBOSITY: Record<ProfileId, TextVerbosity> = {
+  preceptor: "low",
+  tutor: "high",
+  escritor: "high",
+  introdutor: "medium",
+};
+
+export const PROFILE_RESPONSE_FORMAT: Record<ProfileId, ResponseFormatId> = {
+  preceptor: "conscienciological",
+  tutor: "conscienciological",
+  escritor: "conscienciological",
+  introdutor: "chatgpt",
+};
+
 export const CHATGPT_SYSTEM_PROMPT =
   "Você é o ConsBOT, um assistente atencioso, claro, natural e objetivo. Responda sempre no idioma do usuário. Use Markdown quando melhorar a clareza. Adapte a profundidade, a extensão e a estrutura à consulta. Não invente informações; quando houver incerteza relevante, indique-a claramente.";
 
@@ -169,6 +203,7 @@ export type ChatSettings = {
   model: ModelId;
   vectorStoreId: VectorStoreId;
   responseFormat: ResponseFormatId;
+  profile: ProfileId;
   systemPrompt: string;
   reasoningEffort: "none" | "low" | "medium" | "high" | "xhigh" | "max";
   textVerbosity: TextVerbosity;
@@ -195,13 +230,26 @@ export function withResponseFormat<T extends ChatSettings>(
   };
 }
 
+/** Settings com `profile` novo, atualizando a verbosidade e o formato de resposta
+ *  canônico correspondente (Introdutor ativa ChatGPT; os demais ativam
+ *  Conscienciológico). O usuário ainda pode alterar o formato manualmente depois. */
+export function withProfile<T extends ChatSettings>(settings: T, profile: ProfileId): T {
+  const format = PROFILE_RESPONSE_FORMAT[profile];
+  return {
+    ...withResponseFormat(settings, format),
+    profile,
+    textVerbosity: PROFILE_VERBOSITY[profile],
+  };
+}
+
 export const DEFAULT_SETTINGS: ChatSettings = {
   model: "gpt-5.6-sol",
   vectorStoreId: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
   responseFormat: "conscienciological",
+  profile: "tutor",
   systemPrompt: CONSCIENTIOLOGICAL_SYSTEM_PROMPT,
   reasoningEffort: "low",
-  textVerbosity: "low",
+  textVerbosity: "high",
   vectorMaxResults: 5,
   agent: AGENT_SETTINGS_DEFAULT,
 };
@@ -266,6 +314,12 @@ export function systemPromptWithVerbosity(settings: ChatSettings) {
 
   if (isEnglishVectorStore(settings.vectorStoreId)) {
     prompt = prompt ? `${prompt}\n\n${ENGLISH_STORE_INSTRUCTION}` : ENGLISH_STORE_INSTRUCTION;
+  }
+
+  const profileId = settings.profile ?? "tutor";
+  const profileInstruction = PROFILE_INSTRUCTIONS[profileId];
+  if (profileInstruction) {
+    prompt = prompt ? `${prompt}\n\n${profileInstruction}` : profileInstruction;
   }
 
   const instruction = VERBOSITY_INSTRUCTIONS[settings.textVerbosity];

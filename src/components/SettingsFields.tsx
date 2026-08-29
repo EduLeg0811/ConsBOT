@@ -13,21 +13,25 @@ import {
   isEnglishVectorStore,
   MODELS,
   normalizeVectorMaxResults,
+  PROFILES,
+  PROFILE_VERBOSITY,
   RAG_RESULTS_MAX,
   RAG_RESULTS_MIN,
   RAG_RESULTS_STEP,
   RESPONSE_FORMATS,
+  withProfile,
   withResponseFormat,
   type ChatSettings,
   type ModelId,
+  type ProfileId,
   type ResponseFormatId,
 } from "@/lib/chat-settings";
 
 type Props = {
   value: ChatSettings;
   onChange: (settings: ChatSettings) => void;
-  /** Com ACCESS_LEVEL=0 o painel existe, mas só com verbosidade e formato:
-   *  modelo, raciocínio, tamanho e prompt de sistema são de admin. Os valores
+  /** Com ACCESS_LEVEL=0 o painel existe, mas só com perfil e formato:
+   *  modelo, raciocínio, tamanho, verbosidade e prompt de sistema são de admin. Os valores
    *  ocultos vêm de DEFAULT_SETTINGS — ver effectiveSettings em ThreadPage. */
   isAdmin: boolean;
 };
@@ -121,34 +125,63 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
               Trechos que a busca RAG devolve por consulta (`max_num_results`).
             </p>
           </div>
+
+          <div className="space-y-2">
+            <Label>Verbosidade da resposta</Label>
+            <Select
+              value={draft.textVerbosity}
+              onValueChange={(value) =>
+                setDraft({ ...draft, textVerbosity: value as ChatSettings["textVerbosity"] })
+              }
+            >
+              <SelectTrigger className="bg-card/90 text-xs shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="text-xs">
+                <SelectItem className="text-xs" value="low">
+                  Baixa — mais concisa
+                </SelectItem>
+                <SelectItem className="text-xs" value="medium">
+                  Média — equilibrada
+                </SelectItem>
+                <SelectItem className="text-xs" value="high">
+                  Alta — mais detalhada
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Nível de detalhe do texto (ajuste direto de admin).
+            </p>
+          </div>
         </>
       ) : null}
 
       <div className="space-y-2">
-        <Label>Verbosidade da resposta</Label>
-        <Select
-          value={draft.textVerbosity}
-          onValueChange={(value) =>
-            setDraft({ ...draft, textVerbosity: value as ChatSettings["textVerbosity"] })
-          }
-        >
-          <SelectTrigger className="bg-card/90 text-xs shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="text-xs">
-            <SelectItem className="text-xs" value="low">
-              Baixa — mais concisa
-            </SelectItem>
-            <SelectItem className="text-xs" value="medium">
-              Média — equilibrada
-            </SelectItem>
-            <SelectItem className="text-xs" value="high">
-              Alta — mais detalhada
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <Label>Perfil</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {PROFILES.map((profile) => {
+            const selected = (draft.profile ?? "tutor") === profile.id;
+            return (
+              <button
+                className={
+                  selected
+                    ? "rounded-lg border border-primary bg-primary/8 px-3 py-2 text-left shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]"
+                    : "rounded-lg border border-border bg-card/90 px-3 py-2 text-left transition-colors hover:bg-primary/5"
+                }
+                key={profile.id}
+                type="button"
+                onClick={() => setDraft(withProfile(draft, profile.id))}
+              >
+                <span className="block text-xs font-medium">{profile.label}</span>
+                <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+                  {profile.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Nível de detalhe do texto.
+          Tom e estilo da resposta.
         </p>
       </div>
 
