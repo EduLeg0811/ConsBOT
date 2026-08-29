@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { ChatSidebar, ChatSidebarSheet } from "@/components/ChatSidebar";
 import { ChatWindow } from "@/components/ChatWindow";
+import { prefetchVectorStoreSources } from "@/components/VectorStoreSources";
 import { Toaster } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -141,6 +142,38 @@ export function ThreadPage() {
     : DEFAULT_SETTINGS;
 
   const goTo = (id: string) => setActiveId(id);
+
+  // Pré-carrega no background a lista de arquivos da base RAG padrão em tempo ocioso,
+  // sem atrasar a inicialização da tela nem a digitação do usuário.
+  useEffect(() => {
+    const storeId = effectiveSettings.vectorStoreId;
+    if (!storeId || storeId === "none") return;
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      const handle = (
+        window as unknown as {
+          requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number;
+        }
+      ).requestIdleCallback(
+        () => {
+          prefetchVectorStoreSources(storeId);
+        },
+        { timeout: 3000 },
+      );
+      return () => {
+        if ("cancelIdleCallback" in window) {
+          (window as unknown as { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(
+            handle,
+          );
+        }
+      };
+    }
+
+    const timer = setTimeout(() => {
+      prefetchVectorStoreSources(storeId);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [effectiveSettings.vectorStoreId]);
 
   const cycleContainerWidth = () => {
     const currentIndex = CONTAINER_WIDTHS.indexOf(containerWidth);

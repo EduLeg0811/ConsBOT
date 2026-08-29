@@ -37,7 +37,45 @@ type SourcesResponse = {
 // consulta já concluída. A atualização explícita continua sendo a fonte de
 // uma nova leitura da OpenAI..
 const cachedSourcesByStore = new Map<VectorStoreId, SourcesResponse>();
+const inFlightRequestsByStore = new Map<VectorStoreId, Promise<SourcesResponse>>();
 let hasInitializedSourcesPanel = false;
+
+export function fetchVectorStoreFiles(
+  storeId: VectorStoreId,
+  forceRefresh = false,
+): Promise<SourcesResponse> {
+  if (!forceRefresh) {
+    const cached = cachedSourcesByStore.get(storeId);
+    if (cached) return Promise.resolve(cached);
+
+    const inFlight = inFlightRequestsByStore.get(storeId);
+    if (inFlight) return inFlight;
+  }
+
+  const promise = fetch(`${API_BASE}/api/vector-stores/${encodeURIComponent(storeId)}/files`, {
+    headers: { Accept: "application/json" },
+  })
+    .then(async (response) => {
+      const body = (await response.json()) as SourcesResponse;
+      if (!response.ok) throw new Error(body.detail || "Não foi possível carregar as fontes.");
+      cachedSourcesByStore.set(storeId, body);
+      return body;
+    })
+    .finally(() => {
+      inFlightRequestsByStore.delete(storeId);
+    });
+
+  inFlightRequestsByStore.set(storeId, promise);
+  return promise;
+}
+
+/** Pré-carrega fontes de uma base no background sem onerar a inicialização */
+export function prefetchVectorStoreSources(storeId: VectorStoreId) {
+  if (!storeId || storeId === "none" || cachedSourcesByStore.has(storeId)) return;
+  fetchVectorStoreFiles(storeId).catch(() => {
+    // Falha silenciosa em background; a interface tenta novamente se o usuário abrir o menu
+  });
+}
 
 function formatBytes(bytes: number | null) {
   if (bytes === null) return null;
@@ -129,38 +167,60 @@ export function VectorStoreSources({
   useEffect(() => {
     const requestedStoreId = request.vectorStoreId;
     if (requestedStoreId === "none") {
-      // Ao remontar o painel após trocar de menu, `data` já pode ter sido
-      // restaurado do cache. Não o limpe: a ausência de uma nova requisição
-      // significa justamente que o usuário ainda não pediu atualização.
+      // Se não há nova requisição mas já há uma busca em andamento no prefetch, conectar a ela
+      const inFlight = inFlightRequestsByStore.get(selectedStoreId);
+      if (inFlight && !cachedSourcesByStore.has(selectedStoreId)) {
+        let active = true;
+        setLoading(true);
+        inFlight
+          .then((body) => {
+            if (active) {
+              setData(body);
+              setError(null);
+            }
+          })
+          .catch((err: unknown) => {
+            if (active) {
+              setError(err instanceof Error ? err.message : "Não foi possível carregar as fontes.");
+            }
+          })
+          .finally(() => {
+            if (active) setLoading(false);
+          });
+        return () => {
+          active = false;
+        };
+      }
       setError(null);
       setLoading(false);
       return;
     }
 
-    const controller = new AbortController();
+    let active = true;
     setLoading(true);
     setError(null);
 
-    void fetch(`${API_BASE}/api/vector-stores/${encodeURIComponent(requestedStoreId)}/files`, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    })
-      .then(async (response) => {
-        const body = (await response.json()) as SourcesResponse;
-        if (!response.ok) throw new Error(body.detail || "Não foi possível carregar as fontes.");
-        cachedSourcesByStore.set(requestedStoreId, body);
-        setData(body);
+    const force = request.refreshKey > 0;
+    fetchVectorStoreFiles(requestedStoreId, force)
+      .then((body) => {
+        if (active) {
+          setData(body);
+          setError(null);
+        }
       })
-      .catch((reason: unknown) => {
-        if (reason instanceof DOMException && reason.name === "AbortError") return;
-        setError(reason instanceof Error ? reason.message : "Não foi possível carregar as fontes.");
+      .catch((err: unknown) => {
+        if (active) {
+          setError(err instanceof Error ? err.message : "Não foi possível carregar as fontes.");
+        }
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (active) setLoading(false);
       });
 
-    return () => controller.abort();
-  }, [request]);
+    return () => {
+      active = false;
+    };
+  }, [request, selectedStoreId]);
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
