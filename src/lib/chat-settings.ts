@@ -94,7 +94,7 @@ export const PROFILE_INSTRUCTIONS: Record<ProfileId, string> = {
 
 export const PROFILE_VERBOSITY: Record<ProfileId, TextVerbosity> = {
   preceptor: "low",
-  tutor: "high",
+  tutor: "medium",
   escritor: "high",
   introdutor: "medium",
 };
@@ -259,7 +259,7 @@ export const DEFAULT_SETTINGS: ChatSettings = {
   profile: "tutor",
   systemPrompt: CONSCIENTIOLOGICAL_SYSTEM_PROMPT,
   reasoningEffort: "low",
-  textVerbosity: "high",
+  textVerbosity: "medium",
   vectorMaxResults: 10,
   agent: AGENT_SETTINGS_DEFAULT,
 };
@@ -344,7 +344,7 @@ export function systemPromptWithVerbosity(settings: ChatSettings) {
  *  aplica em app/core/llm.py — melhor recusar aqui do que ser silenciosamente
  *  ajustado do outro lado. */
 export const RAG_RESULTS_MIN = 5;
-export const RAG_RESULTS_MAX = 20;
+export const RAG_RESULTS_MAX = 50;
 export const RAG_RESULTS_STEP = 5;
 
 /** Encaixa na escala 5/10/15/20 do slider, além de respeitar o 1..20 do
