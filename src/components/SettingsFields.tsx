@@ -117,7 +117,7 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
               }
             />
             <div className="flex justify-between px-0.5 text-[10px] tabular-nums text-muted-foreground">
-              {[5, 10, 15, 20].map((value) => (
+              {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map((value) => (
                 <span key={value}>{value}</span>
               ))}
             </div>
