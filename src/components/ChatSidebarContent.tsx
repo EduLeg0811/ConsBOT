@@ -25,6 +25,8 @@ import type { ChatThread } from "@/lib/chat-store";
 import { sanitizeAuditValue, type AuditLog } from "@/lib/audit-log";
 import { cn } from "@/lib/utils";
 
+export type SidebarTab = "chats" | "settings" | "sources" | "logs";
+
 export type ChatSidebarProps = {
   threads: ChatThread[];
   activeId: string;
@@ -38,6 +40,8 @@ export type ChatSidebarProps = {
   onClearAll: () => void;
   auditLogs: AuditLog[];
   onClearAuditLogs: () => void;
+  activeTab?: SidebarTab;
+  onTabChange?: (tab: SidebarTab) => void;
 };
 
 function formatThreadDate(timestamp: number) {
@@ -62,8 +66,16 @@ export function ChatSidebarContent({
   onClearAll,
   auditLogs,
   onClearAuditLogs,
+  activeTab,
+  onTabChange,
 }: ChatSidebarProps) {
-  const [tab, setTab] = useState<"chats" | "settings" | "sources" | "logs">("chats");
+  const [internalTab, setInternalTab] = useState<SidebarTab>("chats");
+  const tab = activeTab ?? internalTab;
+  const setTab = (nextTab: SidebarTab | ((prev: SidebarTab) => SidebarTab)) => {
+    const resolved = typeof nextTab === "function" ? nextTab(tab) : nextTab;
+    setInternalTab(resolved);
+    onTabChange?.(resolved);
+  };
   const [logsEnabled, setLogsEnabled] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");

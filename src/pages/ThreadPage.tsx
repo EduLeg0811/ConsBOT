@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Maximize2, Moon, Sun } from "lucide-react";
+import { Maximize2, Moon, SlidersHorizontal, Sun } from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatSidebar, ChatSidebarSheet } from "@/components/ChatSidebar";
+import type { SidebarTab } from "@/components/ChatSidebarContent";
 import { ChatWindow } from "@/components/ChatWindow";
 import { prefetchVectorStoreSources } from "@/components/VectorStoreSources";
 import { Toaster } from "@/components/ui/sonner";
@@ -12,6 +13,7 @@ import {
   allowedVectorStoreId,
   DEFAULT_SETTINGS,
   isEnglishVectorStore,
+  PROFILES,
   PROFILE_VERBOSITY,
   systemPromptForFormat,
   withResponseFormat,
@@ -70,6 +72,8 @@ export function ThreadPage() {
     return next;
   });
   const [activeId, setActiveId] = useState<string>(() => threads[0]!.id);
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("chats");
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   // Feature-gating de UI, não uma fronteira de segurança: o admin mode antes
   // era um pedido a uma rota serverless própria (ACCESS_LEVEL no ambiente do
@@ -305,6 +309,11 @@ export function ThreadPage() {
     );
   }
 
+  const handleOpenSettings = () => {
+    setSidebarTab("settings");
+    setMobileSheetOpen(true);
+  };
+
   const sidebarProps = {
     threads,
     activeId,
@@ -318,6 +327,8 @@ export function ThreadPage() {
     onClearAll: handleClearAll,
     auditLogs,
     onClearAuditLogs: handleClearAuditLogs,
+    activeTab: sidebarTab,
+    onTabChange: setSidebarTab,
   };
   const currentContainerWidth = CONTAINER_WIDTH_CONFIG[containerWidth];
 
@@ -333,7 +344,11 @@ export function ThreadPage() {
             )}
           >
             <div className="lg:hidden">
-              <ChatSidebarSheet {...sidebarProps} />
+              <ChatSidebarSheet
+                {...sidebarProps}
+                open={mobileSheetOpen}
+                onOpenChange={setMobileSheetOpen}
+              />
             </div>
             <a
               href="https://www.cons-ia.org"
@@ -394,55 +409,28 @@ export function ThreadPage() {
             )}
           >
             <TooltipProvider delayDuration={250}>
-              <div className="flex items-center gap-1.5" aria-label="Formato da resposta">
-                {[
-                  {
-                    id: "chatgpt",
-                    label: isEnglishVectorStore(effectiveSettings.vectorStoreId)
-                      ? "ChatGPT Format"
-                      : "Formato ChatGPT",
-                    description: isEnglishVectorStore(effectiveSettings.vectorStoreId)
-                      ? "Free and conversational response in ChatGPT's standard style."
-                      : "Resposta livre e conversacional, no estilo padrão do ChatGPT.",
-                  },
-                  {
-                    id: "conscienciological",
-                    label: isEnglishVectorStore(effectiveSettings.vectorStoreId)
-                      ? "Conscientiological Confor"
-                      : "Confor Conscienciológico",
-                    description: isEnglishVectorStore(effectiveSettings.vectorStoreId)
-                      ? "Structured response in Conscientiology format."
-                      : "Resposta estruturada no confor da Conscienciologia.",
-                  },
-                ].map((format) => {
-                  const selected = active.settings.responseFormat === format.id;
-                  return (
-                    <Tooltip key={format.id}>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          aria-pressed={selected}
-                          onClick={() =>
-                            handleSettingsChange(
-                              withResponseFormat(active.settings, format.id as ResponseFormatId),
-                            )
-                          }
-                          className={
-                            selected
-                              ? "rounded-lg border border-orange-300/80 bg-orange-50 px-2.5 py-1.5 text-[11px] font-medium text-orange-800 shadow-[0_1px_4px_-3px_rgba(157,78,25,0.65)] dark:border-orange-300/35 dark:bg-orange-400/15 dark:text-orange-200"
-                              : "rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
-                          }
-                        >
-                          {format.label}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-56 bg-popover text-center text-[11px] leading-snug text-popover-foreground">
-                        {format.description}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleOpenSettings}
+                    className="group inline-flex items-center gap-2 rounded-full border border-border/80 bg-card/80 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition-all duration-200 hover:border-primary/50 hover:bg-card hover:text-foreground hover:shadow active:scale-[0.98]"
+                    aria-label="Ajustar estilo das respostas no menu de configurações"
+                  >
+                    <SlidersHorizontal className="size-3.5 text-primary transition-transform duration-200 group-hover:rotate-45" />
+                    <span>Estilo das respostas</span>
+                    <span className="h-3 w-px bg-border/80" />
+                    <span className="font-semibold text-foreground">
+                      {PROFILES.find(
+                        (p) => p.id === (active.settings.profile ?? DEFAULT_SETTINGS.profile),
+                      )?.label ?? "Tutor"}
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-64 bg-popover text-center text-[11px] leading-snug text-popover-foreground">
+                  Clique para abrir as configurações e personalizar o perfil, formato e parâmetros.
+                </TooltipContent>
+              </Tooltip>
             </TooltipProvider>
           </div>
         </div>

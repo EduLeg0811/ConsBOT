@@ -54,8 +54,15 @@ export function ChatSidebar(props: ChatSidebarProps) {
   );
 }
 
-export function ChatSidebarSheet(props: ChatSidebarProps) {
-  const [open, setOpen] = useState(false);
+export function ChatSidebarSheet(
+  props: ChatSidebarProps & {
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+  },
+) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = props.open ?? internalOpen;
+  const setOpen = props.onOpenChange ?? setInternalOpen;
 
   const close = () => setOpen(false);
 
