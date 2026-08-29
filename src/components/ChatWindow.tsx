@@ -21,6 +21,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import {
   MODELS,
+  PROFILES,
   isEnglishVectorStore,
   systemPromptWithVerbosity,
   VECTOR_STORES,
@@ -317,6 +318,7 @@ export function ChatWindow({
   settingsRef.current = settings;
   const activeModel = MODELS.find((model) => model.id === settings.model);
   const activeVectorStore = VECTOR_STORES.find((store) => store.id === settings.vectorStoreId);
+  const activeProfile = PROFILES.find((profile) => profile.id === (settings.profile ?? "tutor"));
   const isEnglish = isEnglishVectorStore(settings.vectorStoreId);
 
   // Contrato do módulo AGENT com o ConsBOT: é por aqui que ele alcança a API,
@@ -340,6 +342,7 @@ export function ChatWindow({
   );
   const llmParameters = [
     `GPT-5.6 ${activeModel?.label.replace("ConsBOT ", "") ?? "Terra"}`,
+    activeProfile?.label ?? "Tutor",
     !isMobile ? REASONING_LABELS[settings.reasoningEffort] : undefined,
     { low: "Low verbosity", medium: "Medium verbosity", high: "High verbosity" }[
       settings.textVerbosity
