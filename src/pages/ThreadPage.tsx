@@ -414,12 +414,12 @@ export function ThreadPage() {
                   <button
                     type="button"
                     onClick={handleOpenSettings}
-                    className="group inline-flex items-center gap-2 rounded-full border border-border/80 bg-card/80 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition-all duration-200 hover:border-primary/50 hover:bg-card hover:text-foreground hover:shadow active:scale-[0.98]"
+                    className="group inline-flex items-center gap-2 rounded-full border border-[#E4DBC8] bg-[#F7F2E7] px-3.5 py-1.5 text-xs font-medium text-stone-700 shadow-xs backdrop-blur transition-all duration-200 hover:border-primary/60 hover:bg-[#EFE8D6] hover:text-stone-900 hover:shadow-sm active:scale-[0.98] dark:border-[#423C32] dark:bg-[#28241D] dark:text-stone-300 dark:hover:border-primary/50 dark:hover:bg-[#332E25] dark:hover:text-stone-100"
                     aria-label="Ajustar estilo das respostas no menu de configurações"
                   >
                     <SlidersHorizontal className="size-3.5 text-primary transition-transform duration-200 group-hover:rotate-45" />
                     <span>Estilo das respostas</span>
-                    <span className="h-3 w-px bg-border/80" />
+                    <span className="h-3 w-px bg-[#D9CEB7] dark:bg-[#4A4337]" />
                     <span className="font-semibold text-foreground">
                       {PROFILES.find(
                         (p) => p.id === (active.settings.profile ?? DEFAULT_SETTINGS.profile),
