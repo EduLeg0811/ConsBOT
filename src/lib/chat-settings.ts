@@ -255,9 +255,9 @@ export function withProfile<T extends ChatSettings>(settings: T, profile: Profil
 export const DEFAULT_SETTINGS: ChatSettings = {
   model: "gpt-5.6-sol",
   vectorStoreId: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
-  responseFormat: "conscienciological",
+  responseFormat: "chatgpt",
   profile: "tutor",
-  systemPrompt: CONSCIENTIOLOGICAL_SYSTEM_PROMPT,
+  systemPrompt: CHATGPT_SYSTEM_PROMPT,
   reasoningEffort: "low",
   textVerbosity: "medium",
   vectorMaxResults: 10,
