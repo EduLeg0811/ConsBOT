@@ -1,21 +1,19 @@
-import type {
-  AgentAnswerMode,
-  AgentDelivery,
-  AgentIntentId,
-  AgentVerbeteField,
-} from "@/agent/config";
+import type { AgentIntentId, AgentVerbeteField } from "@/agent/config";
 import type { AgentHost } from "@/agent/host";
 import type { AgentSettings } from "@/agent/settings";
 
-export type { AgentAnswerMode, AgentDelivery, AgentIntentId, AgentVerbeteField };
+export type { AgentIntentId, AgentVerbeteField };
+
+/** Decisão exclusiva do classificador para o turno. */
+export type AgentRoute = "direct" | "full" | "corpus" | "clarify";
+export type AgentPlanOrigin = "luna" | "fallback" | "bypass";
 
 /** Tipos de ação que o módulo sabe oferecer.
  *
- * Só existe `open-url` por enquanto: abrir um módulo externo em nova aba.
- * Novos tipos (rota interna, diálogo, download) entram aqui quando houver
- * uma intenção real que precise deles — não antes.
+ * `open-url` vira pill para um módulo externo; `inline-result` é resolvido
+ * dentro da própria resposta do ConsBOT, sem card nem botão adicional.
  */
-export type AgentActionKind = "open-url";
+export type AgentActionKind = "open-url" | "inline-result";
 
 /** Uma ação já pronta para virar botão: rótulo e destino resolvidos. */
 export type AgentAction = {
@@ -29,13 +27,12 @@ export type AgentAction = {
   meta?: Record<string, string>;
 };
 
-/** O que a detecção produz, antes de virar botão. Regras e classificador LLM
- * devolvem isto — é o ponto em que os dois modos se encontram. */
+/** O que o classificador devolve antes de virar botão. */
 export type AgentMatch = {
   intent: AgentIntentId;
   /** Vazio quando a intenção não precisa de termo (ver `termRequired` em AgentTool). */
   term: string;
-  /** Só para `search_verbete`, e só no modo «Busca Integrada» — ver AGENT_VERBETE_FIELDS. */
+  /** Só para `search_verbete` — ver AGENT_VERBETE_FIELDS. */
   field?: AgentVerbeteField;
   /** Só para `search_book`: id da obra quando o usuário nomeia uma. Vazio busca
    * em todas. Ver AGENT_BOOKS. */
@@ -61,12 +58,18 @@ export type AgentCard = {
   items: AgentCardItem[];
 };
 
-/** Tudo que uma regra pode inspecionar para decidir se dispara. */
+/** Contexto mínimo que o classificador e o card interno podem consultar. */
 export type AgentContext = {
   /** Texto da última mensagem do usuário — o gatilho principal. */
   userText: string;
   /** Texto da última resposta do assistente, quando já houver. */
   assistantText?: string;
+  /** Pergunta anterior, para referências curtas como “e no LO?”. */
+  previousUserText?: string;
+  /** Fontes semânticas realmente selecionadas; evita prometer corpus vazio. */
+  semanticSourceIds?: string[];
+  /** File Search está disponível para a resposta principal deste turno. */
+  hasFileSearch?: boolean;
   settings: AgentSettings;
   host: AgentHost;
   threadId: string;
@@ -81,6 +84,7 @@ export type AgentMessage = {
   id: string;
   role: string;
   parts: Array<{ type: string; text?: string }>;
+  metadata?: unknown;
 };
 
 /** Uma capacidade do agente, descrita num arquivo só.
@@ -108,27 +112,32 @@ export type AgentTool = {
    * a exceção: sem título, abre a bibliografia completa. */
   termRequired: boolean;
 
-  /** Detecção determinística — o plano B do modo `rules`. Ausente quando a
-   * intenção depende de julgamento (ver `consulta_dicionarios`). */
+  /** Padrão local reservado a integrações legadas; o Agent atual sempre usa Luna. */
   rule?: (ctx: AgentContext) => AgentMatch | null;
 
-  /** O botão: rótulo e destino externo. */
+  /** Ação já pronta para o destino externo ou a resposta interna. */
   toAction: (match: AgentMatch, ctx: AgentContext) => AgentAction;
 
-  /** A consulta ao Main-Server, no modo «Busca Integrada». */
+  /** Consulta que alimenta uma ação interna, quando houver. */
   execute: (match: AgentMatch, ctx: AgentContext, signal?: AbortSignal) => Promise<AgentCard>;
 };
 
-/** O que o planejador devolve: as ações e como ele quer entregá-las.
- *
- * `delivery` só é consultado no modo «Alimentar LLM»; nos modos «Abrir
- * módulo» e «Busca Integrada» quem decide a entrega é o modo, e o campo é
- * ignorado. Ver AGENT_DELIVERIES em config.ts. */
+/** O plano persistível de um turno do Agent. */
 export type AgentPlan = {
   actions: AgentAction[];
-  delivery: AgentDelivery;
-  /** Quem responde: a própria triagem ou o modelo completo. */
-  answerMode: AgentAnswerMode;
-  /** A resposta curta, quando `answerMode` é `direct`. Vazia em `full`. */
+  route: AgentRoute;
+  /** A resposta curta em `direct` ou a orientação de `corpus`. */
   answer: string;
+  /** Estimativa normalizada do roteador. */
+  confidence: number;
+  /** Rótulo curto, auditável, sem expor cadeia de raciocínio. */
+  reason: string;
+  /** Origem efetiva: Luna, fallback seguro ou bypass. */
+  origin: AgentPlanOrigin;
+  /** Rota antes das proteções locais, quando ela foi ajustada. */
+  proposedRoute?: AgentRoute;
+  /** Duração do roteamento Luna; ausente para fallback local/bypass. */
+  durationMs?: number;
+  /** JSON devolvido pelo classificador Luna, para diagnóstico do turno ADMIN. */
+  classifierResponse?: string;
 };

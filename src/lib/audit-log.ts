@@ -1,9 +1,14 @@
+import type { UIMessage } from "ai";
+
+import type { AgentAction, AgentPlanOrigin, AgentPresentation, AgentRoute } from "@/agent";
+
 export type AuditLog = {
   id: string;
   threadId: string;
   startedAt: number;
   completedAt?: number;
   status: "streaming" | "complete" | "error" | "cancelled";
+  kind?: "llm" | "interaction";
   /** Payload enviado pelo navegador à rota interna /api/chat. */
   request: unknown;
   /** Corpo HTTP efetivamente produzido pelo SDK para POST /v1/responses. */
@@ -12,6 +17,8 @@ export type AuditLog = {
   response?: unknown;
   /** Mensagem final já convertida para o formato de UI do AI SDK. */
   uiResponse?: unknown;
+  /** Pills disponibilizados no turno, preservados na resposta e na auditoria. */
+  agentPills?: AgentPillMetadata[];
 };
 
 /** O que a rota /api/llm do Main-Server envia no chunk `data-llmMeta` ao
@@ -25,13 +32,70 @@ export type OpenAIAuditEvent = {
   finishReason: string;
 };
 
-export type AuditCompletion = Pick<AuditLog, "openaiRequest" | "response" | "uiResponse">;
+export type AuditCompletion = Pick<
+  AuditLog,
+  "openaiRequest" | "response" | "uiResponse" | "agentPills"
+>;
 
 export type AuditDataParts = {
   llmMeta: OpenAIAuditEvent;
 };
 
-export type ConsBotUIMessage = UIMessage<unknown, AuditDataParts>;
+export type TurnConfigSnapshot = {
+  model: string;
+  profile: string;
+  reasoning: string;
+  responseDepth: string;
+  targetWords: number;
+  responseFormat: string;
+  vectorStore: string;
+  retrieval: "standard" | "corpus";
+  semanticSources: string[];
+  agent: {
+    enabled: boolean;
+    presentation: AgentPresentation;
+  };
+};
+
+export type AgentClassifierTrace = {
+  model: string;
+  response: string;
+};
+
+export type AgentPillMetadata = {
+  id: string;
+  label: string;
+  link: string;
+  parameters?: Record<string, unknown>;
+};
+
+export type AuditInteraction = {
+  module: string;
+  action: string;
+  label: string;
+  value?: string;
+  meta?: unknown;
+};
+
+export type ConsBotMessageMetadata = {
+  ragVectorStoreId?: string;
+  semanticContext?: import("@/lib/semantic-context").SemanticContextTurn;
+  turnConfig?: TurnConfigSnapshot;
+  agentClassifier?: AgentClassifierTrace;
+  agentPlan?: {
+    route: AgentRoute;
+    actions: AgentAction[];
+    presentation?: AgentPresentation;
+    confidence?: number;
+    reason?: string;
+    origin?: AgentPlanOrigin;
+    proposedRoute?: AgentRoute;
+    durationMs?: number;
+  };
+  agentPills?: AgentPillMetadata[];
+};
+
+export type ConsBotUIMessage = UIMessage<ConsBotMessageMetadata, AuditDataParts>;
 
 const MAX_LOGS_PER_THREAD = 50;
 let sessionLogs: AuditLog[] = [];
@@ -79,6 +143,19 @@ export function addAuditLog(log: AuditLog) {
   writeAll([...otherLogs, ...threadLogs]);
 }
 
+/** Evento de interface local: não representa uma chamada à LLM. */
+export function logAuditInteraction(threadId: string, event: AuditInteraction) {
+  addAuditLog({
+    id: crypto.randomUUID(),
+    threadId,
+    startedAt: Date.now(),
+    completedAt: Date.now(),
+    status: "complete",
+    kind: "interaction",
+    request: event,
+  });
+}
+
 export function updateAuditLog(id: string, patch: Partial<AuditLog>) {
   const sanitizedPatch = sanitizeAuditValue(patch) as Partial<AuditLog>;
   writeAll(readAll().map((log) => (log.id === id ? { ...log, ...sanitizedPatch } : log)));
@@ -92,4 +169,3 @@ export function clearAuditLogs(threadId: string) {
 export function clearAllAuditLogs() {
   sessionLogs = [];
 }
-import type { UIMessage } from "ai";

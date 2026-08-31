@@ -24,6 +24,8 @@ type Props = {
   error: string | null;
   english: boolean;
   onOpenExternal: () => void;
+  showExternal?: boolean;
+  expandedByDefault?: boolean;
 };
 
 /** Resultado da consulta ao Main-Server, dentro da própria conversa.
@@ -31,8 +33,17 @@ type Props = {
  * Mostra `AGENT_CARD_PREVIEW` linhas e expande no lugar — os demais resultados
  * já vieram na mesma resposta, então «ver mais» não volta à rede. O rodapé leva
  * ao módulo completo, que é onde mora a ferramenta de verdade. */
-export function AgentCard({ action, card, loading, error, english, onOpenExternal }: Props) {
-  const [expanded, setExpanded] = useState(false);
+export function AgentCard({
+  action,
+  card,
+  loading,
+  error,
+  english,
+  onOpenExternal,
+  showExternal = true,
+  expandedByDefault = false,
+}: Props) {
+  const [expanded, setExpanded] = useState(expandedByDefault);
 
   if (loading) {
     return (
@@ -47,14 +58,16 @@ export function AgentCard({ action, card, loading, error, english, onOpenExterna
     return (
       <div className="rounded-xl border border-border bg-card px-3 py-2.5 text-xs text-muted-foreground">
         <p>{error}</p>
-        <button
-          type="button"
-          onClick={onOpenExternal}
-          className="mt-1.5 inline-flex items-center gap-1 text-chart-2 hover:underline"
-        >
-          <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
-          {english ? "Open the full module" : "Abrir o módulo completo"}
-        </button>
+        {showExternal ? (
+          <button
+            type="button"
+            onClick={onOpenExternal}
+            className="mt-1.5 inline-flex items-center gap-1 text-chart-2 hover:underline"
+          >
+            <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
+            {english ? "Open the full module" : "Abrir o módulo completo"}
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -102,14 +115,16 @@ export function AgentCard({ action, card, loading, error, english, onOpenExterna
         ) : (
           <span />
         )}
-        <button
-          type="button"
-          onClick={onOpenExternal}
-          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-chart-2"
-        >
-          <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
-          {english ? "Full module" : "Módulo completo"}
-        </button>
+        {showExternal ? (
+          <button
+            type="button"
+            onClick={onOpenExternal}
+            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-chart-2"
+          >
+            <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
+            {english ? "Full module" : "Módulo completo"}
+          </button>
+        ) : null}
       </div>
     </div>
   );

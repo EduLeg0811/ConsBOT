@@ -1,24 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Maximize2, Moon, SlidersHorizontal, Sun } from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatSidebar, ChatSidebarSheet } from "@/components/ChatSidebar";
 import type { SidebarTab } from "@/components/ChatSidebarContent";
 import { ChatWindow } from "@/components/ChatWindow";
-import { prefetchVectorStoreSources } from "@/components/VectorStoreSources";
+import { ConversationEvidencePanel } from "@/components/ConversationEvidencePanel";
+import { prefetchVectorStoreSources } from "@/lib/vector-store-files";
 import { Toaster } from "@/components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
-  allowedVectorStoreId,
   DEFAULT_SETTINGS,
-  isEnglishVectorStore,
   PROFILES,
-  PROFILE_VERBOSITY,
-  systemPromptForFormat,
-  withResponseFormat,
+  isEnglishVectorStore,
+  settingsForPublicUser,
   type ChatSettings,
-  type ResponseFormatId,
 } from "@/lib/chat-settings";
 import {
   addAuditLog,
@@ -27,9 +24,13 @@ import {
   clearAuditLogs,
   type ConsBotUIMessage,
   loadAuditLogs,
+  logAuditInteraction,
   updateAuditLog,
   type AuditLog,
 } from "@/lib/audit-log";
+import { logFeatureAccess } from "@/lib/access-log";
+import { API_BASE } from "@/lib/main-server";
+import type { AgentHost } from "@/agent";
 import {
   createThread,
   deleteThread,
@@ -73,6 +74,7 @@ export function ThreadPage() {
   });
   const [activeId, setActiveId] = useState<string>(() => threads[0]!.id);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("chats");
+  const [citationsPanelOpen, setCitationsPanelOpen] = useState(false);
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   // Feature-gating de UI, não uma fronteira de segurança: o admin mode antes
@@ -130,20 +132,15 @@ export function ThreadPage() {
   const effectiveSettings = active
     ? isAdmin
       ? active.settings
-      : // Fora do admin o painel expõe apenas formato, verbosidade e base RAG;
-      // todo o resto vem do padrão. O prompt continua sendo o canônico do
-      // formato — não há como customizá-lo aqui, então nunca uma cópia
-      // antiga da thread.
-      {
-        ...DEFAULT_SETTINGS,
-        responseFormat: active.settings.responseFormat,
-        profile: active.settings.profile ?? DEFAULT_SETTINGS.profile,
-        systemPrompt: systemPromptForFormat(active.settings.responseFormat),
-        textVerbosity:
-          PROFILE_VERBOSITY[active.settings.profile ?? DEFAULT_SETTINGS.profile],
-        vectorStoreId: allowedVectorStoreId(active.settings.vectorStoreId, false),
-      }
+      : settingsForPublicUser(active.settings)
     : DEFAULT_SETTINGS;
+  const citationsPanelAvailable =
+    effectiveSettings.retrievalMode === "corpus" ||
+    (effectiveSettings.agent.enabled && effectiveSettings.agent.presentation !== "classic");
+
+  useEffect(() => {
+    if (!citationsPanelAvailable) setCitationsPanelOpen(false);
+  }, [citationsPanelAvailable]);
 
   const goTo = (id: string) => setActiveId(id);
 
@@ -196,6 +193,19 @@ export function ThreadPage() {
 
   const handleNew = () => {
     const thread = createThread(effectiveSettings);
+    logFeatureAccess({
+      module: "sidebar",
+      action: "new_chat",
+      label: "Nova conversa",
+      chat_id: activeId,
+      meta: { origin_chat_id: activeId, created_chat_id: thread.id },
+    });
+    logAuditInteraction(thread.id, {
+      module: "sidebar",
+      action: "new_chat",
+      label: "Nova conversa",
+      meta: { origin_chat_id: activeId, created_chat_id: thread.id },
+    });
     persist(upsertThread(threads ?? [], thread));
     goTo(thread.id);
   };
@@ -213,7 +223,21 @@ export function ThreadPage() {
   };
 
   const handleClearAll = () => {
+    const affectedThreads = threads.length;
     const thread = createThread(effectiveSettings);
+    logFeatureAccess({
+      module: "sidebar",
+      action: "clear_history",
+      label: "Limpar histórico",
+      chat_id: activeId,
+      meta: { affected_threads: affectedThreads, origin_chat_id: activeId },
+    });
+    logAuditInteraction(thread.id, {
+      module: "sidebar",
+      action: "clear_history",
+      label: "Limpar histórico",
+      meta: { affected_threads: affectedThreads, origin_chat_id: activeId },
+    });
     saveThreads([thread]);
     setThreads([thread]);
     toast.success("Histórico apagado deste navegador");
@@ -226,17 +250,13 @@ export function ThreadPage() {
 
   const handleSettingsChange = (settings: ChatSettings) => {
     if (!active) return;
-    const nextSettings = isAdmin
-      ? settings
-      : {
-        ...DEFAULT_SETTINGS,
-        responseFormat: settings.responseFormat,
-        profile: settings.profile ?? DEFAULT_SETTINGS.profile,
-        systemPrompt: systemPromptForFormat(settings.responseFormat),
-        textVerbosity:
-          PROFILE_VERBOSITY[settings.profile ?? DEFAULT_SETTINGS.profile],
-        vectorStoreId: allowedVectorStoreId(settings.vectorStoreId, false),
-      };
+    // Conversas abertas por versões anteriores ainda podem carregar Híbrida.
+    // Ela deixa de injetar corpus e é normalizada para o caminho File Search.
+    const compatibleSettings =
+      (settings.retrievalMode as string) === "hybrid"
+        ? { ...settings, retrievalMode: "standard" as const }
+        : settings;
+    const nextSettings = isAdmin ? compatibleSettings : settingsForPublicUser(compatibleSettings);
     persist(
       upsertThread(threads ?? [], {
         ...active,
@@ -274,6 +294,59 @@ export function ThreadPage() {
   const handleClearAuditLogs = () => {
     clearAuditLogs(activeId);
     setAuditLogs([]);
+  };
+
+  const handleAuditInteraction = useCallback(
+    (event: Parameters<typeof logAuditInteraction>[1]) => {
+      logAuditInteraction(activeId, event);
+      setAuditLogs(loadAuditLogs(activeId));
+    },
+    [activeId],
+  );
+
+  const evidenceHost = useMemo<AgentHost>(
+    () => ({
+      apiBase: API_BASE,
+      english: isEnglishVectorStore(effectiveSettings.vectorStoreId),
+      vectorStoreId: effectiveSettings.vectorStoreId,
+      logEvent: (event) => {
+        const meta = {
+          intent: event.intent,
+          detection: event.detection,
+          via: event.via,
+          ...event.meta,
+        };
+        logFeatureAccess({
+          module: "consbot",
+          action: "pill_click",
+          label: "Pill do Agent",
+          value: event.intent,
+          chat_id: activeId,
+          meta,
+        });
+        handleAuditInteraction({
+          module: "consbot",
+          action: "pill_click",
+          label: "Pill do Agent",
+          value: event.intent,
+          meta,
+        });
+      },
+    }),
+    [activeId, effectiveSettings.vectorStoreId, handleAuditInteraction],
+  );
+
+  const handleQuickAccess = (link: { title: string; url: string }) => {
+    const event = {
+      module: "quick_access",
+      action: "quick_link_click",
+      label: link.title,
+      value: link.url,
+      meta: { title: link.title, url: link.url },
+    };
+    logFeatureAccess({ ...event, chat_id: activeId });
+    logAuditInteraction(activeId, event);
+    setAuditLogs(loadAuditLogs(activeId));
   };
 
   const handleMessagesChange = useCallback(
@@ -327,6 +400,10 @@ export function ThreadPage() {
     onClearAll: handleClearAll,
     auditLogs,
     onClearAuditLogs: handleClearAuditLogs,
+    onQuickAccess: handleQuickAccess,
+    citationsPanelAvailable,
+    citationsPanelOpen,
+    onCitationsPanelOpenChange: setCitationsPanelOpen,
     activeTab: sidebarTab,
     onTabChange: setSidebarTab,
   };
@@ -444,9 +521,21 @@ export function ThreadPage() {
           onMessagesChange={handleMessagesChange}
           onAuditStart={handleAuditStart}
           onAuditComplete={handleAuditComplete}
+          onAuditInteraction={handleAuditInteraction}
           isAdmin={isAdmin}
         />
       </div>
+      {citationsPanelAvailable ? (
+        <ConversationEvidencePanel
+          open={citationsPanelOpen}
+          onOpenChange={setCitationsPanelOpen}
+          messages={(active.messages as ConsBotUIMessage[]) ?? []}
+          threadId={activeId}
+          settings={effectiveSettings.agent}
+          host={evidenceHost}
+          isAdmin={isAdmin}
+        />
+      ) : null}
       <Toaster />
     </div>
   );

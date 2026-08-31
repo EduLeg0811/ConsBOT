@@ -1,4 +1,3 @@
-import { AGENT_ANSWER_MODES, AGENT_DELIVERIES } from "@/agent/config";
 import { AGENT_TOOLS } from "@/agent/tools/registry";
 
 /** JSON Schema do planejador, gerado do registro.
@@ -46,25 +45,28 @@ function buildSchema() {
           additionalProperties: false,
         },
       },
-      delivery: {
+      route: {
         type: "string",
-        enum: [...AGENT_DELIVERIES],
+        enum: ["direct", "full", "corpus", "clarify"],
         description:
-          "Como entregar: card (botão ao lado da resposta) ou context (o resultado alimenta a resposta).",
+          "direct responde apenas mensagens simples; full encaminha ao modelo principal; corpus recupera e exibe trechos, sem chamar o modelo principal; clarify faz uma pergunta curta quando falta informação material.",
       },
-      answer_mode: {
+      confidence: {
+        type: "number",
+        minimum: 0,
+        maximum: 1,
+        description: "Confiança de 0 a 1 na rota e nas ações; em dúvida, use valor baixo e route full.",
+      },
+      reason: {
         type: "string",
-        enum: [...AGENT_ANSWER_MODES],
-        description:
-          "Quem responde: direct (você responde em answer) ou full (o modelo completo responde, com acesso às fontes).",
+        description: "Rótulo curto e factual do motivo da rota, sem cadeia de raciocínio.",
       },
       answer: {
         type: "string",
-        description:
-          "A resposta, quando answer_mode for direct. No máximo duas frases. String vazia quando for full.",
+        description: "Resposta breve em direct ou orientação em corpus. String vazia em full.",
       },
     },
-    required: ["actions", "delivery", "answer_mode", "answer"],
+    required: ["actions", "route", "confidence", "reason", "answer"],
     additionalProperties: false,
   };
 }

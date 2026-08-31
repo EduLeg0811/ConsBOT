@@ -4,25 +4,19 @@
  *  AGENT_MODE — 0 (desligado) | 1 (ligado, padrão)
  * ─────────────────────────────────────────────────────────────────────────────
  *
- *  LIGADO, o ConsBOT passa a exibir BOTÕES OPCIONAIS abaixo da conversa quando
- *  a pergunta do usuário casa com alguma regra de `src/agent/planner/rules.ts`.
- *  Exemplo: pedido de busca literal ("localize a palavra 'consciex'") faz
- *  aparecer um botão que abre o módulo de busca em livros do Cons-ia.org.
+ *  LIGADO, o ConsBOT classifica cada pergunta com Luna/None e decide entre
+ *  resposta direta, resposta completa, recuperação do corpus ou abertura de
+ *  módulos pertinentes.
  *
  *  O que este módulo NÃO faz — de propósito:
  *   - não executa nada sozinho: quem clica é o usuário, sempre.
  *
  *  Apesar do nome, não é um "modo agente" no sentido de tool calling — a LLM
- *  não decide nem executa ferramenta alguma. É detecção de intenção com
- *  sugestão de ação, por regra determinística no cliente ou por classificador.
+ *  roteia o turno, mas nunca executa módulos externos em nome da pessoa.
  *  O catálogo de intenções está em docs/agent-rules.docx.
  *
- *  A única exceção à regra de não interferir é o modo «Alimentar LLM», em que
- *  o resultado da consulta é anexado ao systemPrompt daquele turno — ver
- *  AGENT_LLM_MODES e planner/context.ts.
- *
- *  DESLIGADO (0), o módulo é inerte: <AgentActions /> devolve null e nenhuma
- *  regra é avaliada.
+ *  DESLIGADO (0), o módulo é inerte e as mensagens seguem direto ao modelo
+ *  principal configurado.
  *
  *  Este valor é apenas o PADRÃO da sessão: com ACCESS_LEVEL=1 o menu de
  *  configuração expõe um interruptor que o sobrescreve em `ChatSettings.agent`
@@ -48,8 +42,8 @@ export const AGENT_MODE = agentModeOverride
   ? agentModeOverride === "1"
   : import.meta.env.DEV || AGENT_MODE_DEFAULT === 1;
 
-/** Catálogo de intenções. A ordem importa: é a ordem de avaliação das regras
- * e, em caso de empate, a ordem em que os botões aparecem.
+/** Catálogo de intenções. A ordem define o schema e, em caso de empate,
+ * a ordem em que os botões aparecem.
  *
  * Especificado em docs/agent-rules.docx — este arquivo é a tradução daquele
  * documento para código, e os dois devem ser alterados juntos. */
@@ -59,6 +53,7 @@ export const AGENT_INTENTS = [
   "bibliografia_livros",
   "bibliografia_verbetes",
   "consulta_dicionarios",
+  "list_sources",
 ] as const;
 
 export type AgentIntentId = (typeof AGENT_INTENTS)[number];
@@ -93,6 +88,7 @@ export const AGENT_TARGETS: Record<AgentIntentId, string> = {
   consulta_dicionarios: stripQuery(
     String(import.meta.env.VITE_LEXICONS_URL || "").trim() || "https://lexicons.cons-ia.org/",
   ),
+  list_sources: "#",
 };
 
 /** Campos pelos quais a busca em verbetes pode ser feita.
@@ -108,37 +104,6 @@ export type AgentVerbeteField = (typeof AGENT_VERBETE_FIELDS)[number];
 
 /** Nome do parâmetro de busca, igual nos três destinos. */
 export const AGENT_SEARCH_PARAM = "q";
-
-/** Como o módulo decide se uma pergunta merece ação sugerida.
- *
- * `rules`  — casamento de padrões em `rules.ts`. Roda no cliente, é síncrono,
- *            determinístico e de custo zero; erra por omissão quando o usuário
- *            formula o pedido de um jeito que nenhuma regra prevê, e não
- *            alcança intenções que dependem de julgamento (ver
- *            consulta_dicionarios, que só existe no modo `llm`).
- * `llm`    — uma chamada extra a /api/llm com JSON Schema (`classify.ts`).
- *            Pega paráfrase e ambiguidade, mas custa token e latência por
- *            pergunta, e é não-determinístico.
- */
-export const AGENT_DETECTIONS = [
-  {
-    id: "rules",
-    label: "Regras",
-    description: "Determinístico no cliente.",
-  },
-  {
-    id: "llm",
-    label: "Classificador LLM",
-    description: "Chamada extra por pergunta.",
-  },
-] as const;
-
-export type AgentDetectionId = (typeof AGENT_DETECTIONS)[number]["id"];
-
-/** Padrão da sessão. O classificador é o caminho principal: alcança as quatro
- * ferramentas, entende paráfrase e corrige grafia. As regras ficam como plano
- * B, para quando o Main-Server estiver fora. */
-export const AGENT_DETECTION_DEFAULT: AgentDetectionId = "llm";
 
 /** Tetos de espera do módulo, em milissegundos.
  *
@@ -164,98 +129,17 @@ export const AGENT_CLASSIFIER_MODEL = "gpt-5.6-luna";
  * `id` vai na requisição; `label` é o que o painel de configuração mostra. */
 export const AGENT_CLASSIFIER_REASONING = { id: "none", label: "None" } as const;
 
-/** No modo Classificador LLM, o que o botão faz. Os nomes entre aspas são os
- * rótulos da UI, e são o vocabulário canônico do módulo — comentário, painel
- * e telemetria falam a mesma língua.
- *
- * `link`    — «Abrir módulo». PADRÃO. Abre o módulo externo em nova aba,
- *             levando o termo na URL. Não consulta nada: custo zero e o
- *             usuário decide para onde vai.
- * `api`     — «Busca Integrada». Consulta o endpoint correspondente do
- *             Main-Server e mostra o resultado num card dentro da conversa,
- *             com um link discreto para o módulo completo. Só no clique.
- * `context` — «Alimentar LLM». Consulta ANTES de responder e anexa o
- *             resultado ao systemPrompt daquele turno. É o único modo que
- *             atrasa a resposta, e o único que interfere no prompt.
- *
- * Vale apenas para a detecção `llm`; em `rules` o botão é sempre link. */
-export const AGENT_LLM_MODES = [
-  {
-    id: "link",
-    label: "Abrir módulo",
-    description: "Nova aba, com o termo na URL.",
-  },
-  {
-    id: "api",
-    label: "Busca Integrada",
-    description: "Consulta a API e mostra num card.",
-  },
-  {
-    id: "context",
-    label: "Alimentar LLM",
-    description: "Busca antes e entrega à LLM.",
-  },
-] as const;
-
-export type AgentLlmModeId = (typeof AGENT_LLM_MODES)[number]["id"];
-
-export const AGENT_LLM_MODE_DEFAULT: AgentLlmModeId = "link";
-
-/** Como o sistema deve entregar a resposta do ConsBOT:
- *
- * `auto` — PADRÃO. Chama a resposta completa da LLM logo no início (streaming).
- * `pill` — Quando a triagem identifica resposta direta, exibe resposta curta e o pill "Resposta completa".
- */
-export const AGENT_FULL_ANSWER_MODES = [
-  {
-    id: "auto",
-    label: "Automática",
-    description: "Dispara a resposta completa direto.",
-  },
-  {
-    id: "pill",
-    label: "Via Pill",
-    description: "Resposta curta + pill 'Resposta completa'.",
-  },
-] as const;
-
-export type AgentFullAnswerModeId = (typeof AGENT_FULL_ANSWER_MODES)[number]["id"];
-
-export const AGENT_FULL_ANSWER_DEFAULT: AgentFullAnswerModeId = "auto";
-
-/** Quem responde a mensagem — a decisão de porteiro da triagem.
- *
- * `direct`: a própria triagem responde, em `answer`. Só vale quando a
- *           resposta não depende do corpus: saudação, meta-pergunta, ou
- *           pedido de busca — nesse caso a busca É a resposta, e `answer` é
- *           só a frase de contexto que acompanha o pill.
- * `full`:   o modelo completo responde, com acesso às fontes. É o padrão e
- *           o destino de tudo que precise ser escrito ou consultado.
- *
- * O viés é deliberadamente conservador: gastar uma chamada à toa é barato,
- * engolir uma pergunta que merecia resposta é caro. */
-export const AGENT_ANSWER_MODES = ["direct", "full"] as const;
-
-export type AgentAnswerMode = (typeof AGENT_ANSWER_MODES)[number];
+/** Política local de confiança. O modelo fornece uma estimativa, mas a decisão
+ * final é sempre do cliente: rotas que escondem a resposta principal exigem
+ * confiança alta; incerteza segue para o modelo principal. */
+export const AGENT_CONFIDENCE_HIGH = 0.78;
+export const AGENT_CONFIDENCE_MEDIUM = 0.55;
+/** Compatibilidade com respostas gravadas/testes anteriores ao campo. */
+export const AGENT_CONFIDENCE_DEFAULT = 0.8;
 
 /** Teto da frase que acompanha o pill. Duas frases, não um parágrafo: quem
  * pediu busca quer a busca, não texto. */
 export const AGENT_ANSWER_MAX = 320;
-
-/** Como o planejador quer que o resultado chegue ao usuário. Só é consultado
- * no modo «Alimentar LLM»; nos outros dois quem decide é o modo.
- *
- * Havia um terceiro valor, `both`, que o cliente tratava exatamente como
- * `context` — o botão do card aparece nos dois casos de qualquer forma. Ele
- * custava duas linhas de prompt em toda classificação para descrever uma
- * distinção que ninguém lia; saiu. */
-export const AGENT_DELIVERIES = ["card", "context"] as const;
-
-export type AgentDelivery = (typeof AGENT_DELIVERIES)[number];
-
-/** Quantos resultados de cada ferramenta entram no prompt da resposta. Menos
- * que no card: aqui cada item custa token em toda pergunta que buscar. */
-export const AGENT_CONTEXT_ITEMS = 6;
 
 /** Quantos resultados pedir ao Main-Server e quantos mostrar antes do
  * «ver mais». Buscar mais do que se mostra é o que permite expandir sem uma

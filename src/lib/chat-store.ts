@@ -1,12 +1,11 @@
-import type { UIMessage } from "ai";
-
 import { DEFAULT_SETTINGS, type ChatSettings } from "@/lib/chat-settings";
+import type { ConsBotUIMessage } from "@/lib/audit-log";
 
 export type ChatThread = {
   id: string;
   title: string;
   updatedAt: number;
-  messages: UIMessage[];
+  messages: ConsBotUIMessage[];
   settings: ChatSettings;
 };
 
@@ -27,7 +26,7 @@ function normalize(raw: unknown): ChatThread | null {
   if (!raw || typeof raw !== "object") return null;
   const t = raw as Partial<ChatThread>;
   if (typeof t.id !== "string") return null;
-  const messages = Array.isArray(t.messages) ? (t.messages as UIMessage[]) : [];
+  const messages = Array.isArray(t.messages) ? (t.messages as ConsBotUIMessage[]) : [];
   return {
     id: t.id,
     title: typeof t.title === "string" && t.title.trim() ? t.title : "Nova conversa",
@@ -114,7 +113,7 @@ export function clearAllThreads() {
   window.localStorage.removeItem(THREADS_KEY);
 }
 
-export function titleFromMessages(messages: UIMessage[]): string | null {
+export function titleFromMessages(messages: ConsBotUIMessage[]): string | null {
   const first = messages.find((m) => m.role === "user");
   if (!first) return null;
   const text = first.parts

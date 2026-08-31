@@ -11,71 +11,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { VECTOR_STORES, vectorStoresFor, type VectorStoreId } from "@/lib/chat-settings";
-import { API_BASE } from "@/lib/main-server";
 import { cn } from "@/lib/utils";
+import {
+  cachedVectorStoreFiles,
+  fetchVectorStoreFiles,
+  type VectorStoreFilesResponse,
+} from "@/lib/vector-store-files";
 
-type SourceFile = {
-  id: string;
-  filename: string;
-  status: "in_progress" | "completed" | "cancelled" | "failed";
-  createdAt: number;
-  usageBytes: number | null;
-  bytes: number | null;
-  attributes: Record<string, string | number | boolean> | null;
-  lastError: { code: string; message: string } | null;
-};
-
-type SourcesResponse = {
-  vectorStore: { id: string; label: string };
-  totalFiles: number;
-  files: SourceFile[];
-  truncated: boolean;
-  detail?: string;
-};
-
-// Cache em memória da sessão: alternar os painéis não deve repetir uma
-// consulta já concluída. A atualização explícita continua sendo a fonte de
-// uma nova leitura da OpenAI..
-const cachedSourcesByStore = new Map<VectorStoreId, SourcesResponse>();
-const inFlightRequestsByStore = new Map<VectorStoreId, Promise<SourcesResponse>>();
 let hasInitializedSourcesPanel = false;
-
-export function fetchVectorStoreFiles(
-  storeId: VectorStoreId,
-  forceRefresh = false,
-): Promise<SourcesResponse> {
-  if (!forceRefresh) {
-    const cached = cachedSourcesByStore.get(storeId);
-    if (cached) return Promise.resolve(cached);
-
-    const inFlight = inFlightRequestsByStore.get(storeId);
-    if (inFlight) return inFlight;
-  }
-
-  const promise = fetch(`${API_BASE}/api/vector-stores/${encodeURIComponent(storeId)}/files`, {
-    headers: { Accept: "application/json" },
-  })
-    .then(async (response) => {
-      const body = (await response.json()) as SourcesResponse;
-      if (!response.ok) throw new Error(body.detail || "Não foi possível carregar as fontes.");
-      cachedSourcesByStore.set(storeId, body);
-      return body;
-    })
-    .finally(() => {
-      inFlightRequestsByStore.delete(storeId);
-    });
-
-  inFlightRequestsByStore.set(storeId, promise);
-  return promise;
-}
-
-/** Pré-carrega fontes de uma base no background sem onerar a inicialização */
-export function prefetchVectorStoreSources(storeId: VectorStoreId) {
-  if (!storeId || storeId === "none" || cachedSourcesByStore.has(storeId)) return;
-  fetchVectorStoreFiles(storeId).catch(() => {
-    // Falha silenciosa em background; a interface tenta novamente se o usuário abrir o menu
-  });
-}
 
 function formatBytes(bytes: number | null) {
   if (bytes === null) return null;
@@ -117,8 +60,8 @@ export function VectorStoreSources({
   isAdmin: boolean;
 }) {
   const [selectedStoreId, setSelectedStoreId] = useState<VectorStoreId>(vectorStoreId);
-  const [data, setData] = useState<SourcesResponse | null>(
-    () => cachedSourcesByStore.get(vectorStoreId) ?? null,
+  const [data, setData] = useState<VectorStoreFilesResponse | null>(
+    () => cachedVectorStoreFiles(vectorStoreId) ?? null,
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +69,7 @@ export function VectorStoreSources({
   const [request, setRequest] = useState<{ vectorStoreId: VectorStoreId; refreshKey: number }>(
     () => ({
       vectorStoreId:
-        hasInitializedSourcesPanel || cachedSourcesByStore.has(vectorStoreId)
+        hasInitializedSourcesPanel || cachedVectorStoreFiles(vectorStoreId)
           ? "none"
           : vectorStoreId,
       refreshKey: 0,
@@ -134,10 +77,35 @@ export function VectorStoreSources({
   );
 
   useEffect(() => {
+    let active = true;
     setSelectedStoreId(vectorStoreId);
     setHasPendingSelection(false);
-    setData(cachedSourcesByStore.get(vectorStoreId) ?? null);
     setError(null);
+    if (vectorStoreId === "none") {
+      setData(null);
+      setLoading(false);
+    } else {
+      const cached = cachedVectorStoreFiles(vectorStoreId);
+      setData(cached ?? null);
+      if (!cached) {
+        setLoading(true);
+        void fetchVectorStoreFiles(vectorStoreId)
+          .then((body) => {
+            if (active) setData(body);
+          })
+          .catch((err: unknown) => {
+            if (active) {
+              setError(err instanceof Error ? err.message : "Não foi possível carregar as fontes.");
+            }
+          })
+          .finally(() => {
+            if (active) setLoading(false);
+          });
+      }
+    }
+    return () => {
+      active = false;
+    };
   }, [vectorStoreId]);
 
   const refresh = useCallback(() => {
@@ -154,8 +122,7 @@ export function VectorStoreSources({
       setSelectedStoreId(nextVectorStoreId);
       setError(null);
       setHasPendingSelection(nextVectorStoreId !== vectorStoreId);
-      const cached = cachedSourcesByStore.get(nextVectorStoreId) ?? null;
-      setData(cached);
+      setData(null);
     },
     [vectorStoreId],
   );
@@ -168,29 +135,6 @@ export function VectorStoreSources({
     const requestedStoreId = request.vectorStoreId;
     if (requestedStoreId === "none") {
       // Se não há nova requisição mas já há uma busca em andamento no prefetch, conectar a ela
-      const inFlight = inFlightRequestsByStore.get(selectedStoreId);
-      if (inFlight && !cachedSourcesByStore.has(selectedStoreId)) {
-        let active = true;
-        setLoading(true);
-        inFlight
-          .then((body) => {
-            if (active) {
-              setData(body);
-              setError(null);
-            }
-          })
-          .catch((err: unknown) => {
-            if (active) {
-              setError(err instanceof Error ? err.message : "Não foi possível carregar as fontes.");
-            }
-          })
-          .finally(() => {
-            if (active) setLoading(false);
-          });
-        return () => {
-          active = false;
-        };
-      }
       setError(null);
       setLoading(false);
       return;

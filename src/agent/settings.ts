@@ -1,12 +1,6 @@
-import {
-  AGENT_DETECTION_DEFAULT,
-  AGENT_FULL_ANSWER_DEFAULT,
-  AGENT_LLM_MODE_DEFAULT,
-  AGENT_MODE,
-  type AgentDetectionId,
-  type AgentFullAnswerModeId,
-  type AgentLlmModeId,
-} from "@/agent/config";
+import { AGENT_MODE } from "@/agent/config";
+
+export type AgentPresentation = "citations" | "classic";
 
 /** Preferências do módulo AGENT, guardadas pelo hospedeiro.
  *
@@ -18,20 +12,25 @@ import {
 export type AgentSettings = {
   /** Módulo ligado nesta sessão. Padrão em AGENT_MODE (ver config.ts). */
   enabled: boolean;
-  /** Regras determinísticas no cliente ou classificação por LLM. */
-  detection: AgentDetectionId;
   /** Instruções do classificador. Vazio = padrão do idioma da base ativa. */
   prompt: string;
-  /** No modo `llm`, se o botão abre o módulo externo ou consulta a API. */
-  action: AgentLlmModeId;
-  /** Resposta completa automática ou via pill quando a triagem resolver diretamente. */
-  fullAnswer: AgentFullAnswerModeId;
+  /** Define se Luna pode recuperar corpus ou apenas oferecer direcionamentos. */
+  presentation: AgentPresentation;
 };
 
 export const AGENT_SETTINGS_DEFAULT: AgentSettings = {
   enabled: AGENT_MODE,
-  detection: AGENT_DETECTION_DEFAULT,
   prompt: "",
-  action: AGENT_LLM_MODE_DEFAULT,
-  fullAnswer: AGENT_FULL_ANSWER_DEFAULT,
+  presentation: "classic",
 };
+
+/** Compatibilidade com preferências salvas antes da apresentação ser configurável. */
+export function normalizeAgentSettings(
+  value: Partial<AgentSettings> | null | undefined,
+): AgentSettings {
+  return {
+    enabled: typeof value?.enabled === "boolean" ? value.enabled : AGENT_SETTINGS_DEFAULT.enabled,
+    prompt: typeof value?.prompt === "string" ? value.prompt : "",
+    presentation: value?.presentation === "classic" ? "classic" : "citations",
+  };
+}

@@ -1,6 +1,7 @@
 import { bibliografia } from "@/agent/tools/bibliografia";
 import { bibliografiaVerbetes } from "@/agent/tools/bibliografia-verbetes";
 import { dicionarios } from "@/agent/tools/dicionarios";
+import { listSources } from "@/agent/tools/list-sources";
 import { searchBook } from "@/agent/tools/search-book";
 import { searchVerbete } from "@/agent/tools/search-verbete";
 import type {
@@ -19,14 +20,14 @@ import type {
  * consulta saem todos daqui, então não há um segundo lugar para esquecer de
  * atualizar.
  *
- * A ORDEM importa em dois pontos: é a ordem de avaliação das regras e, em
- * empate, a ordem em que os botões aparecem. */
+ * A ordem define o schema e, em empate, a ordem em que os pills aparecem. */
 export const AGENT_TOOLS: AgentTool[] = [
   searchBook,
   searchVerbete,
   bibliografia,
   bibliografiaVerbetes,
   dicionarios,
+  listSources,
 ];
 
 export function agentTool(name: string): AgentTool | undefined {
@@ -41,8 +42,8 @@ export function agentTool(name: string): AgentTool | undefined {
  * uma por precedência arbitrária. */
 export const MAX_AGENT_ACTIONS = 2;
 
-/** Converte pares (intenção, parâmetros) em botões, deduplicando por intenção
- * e respeitando o teto. Ponto de encontro dos dois modos de detecção. */
+/** Converte pares (intenção, parâmetros) em ações, deduplicando por intenção
+ * e respeitando o teto. */
 export function actionsFromMatches(matches: AgentMatch[], ctx: AgentContext): AgentAction[] {
   const actions: AgentAction[] = [];
   const seen = new Set<AgentIntentId>();

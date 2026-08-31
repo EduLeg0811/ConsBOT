@@ -7,8 +7,10 @@
     "dev:all": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./dev.ps1",
     "dev:silent": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./dev.ps1 -Silent",
     "agent:suite": "node scripts/agent-planner-suite.mjs",
+    "validate:chat-settings": "node scripts/validate-chat-settings.mjs",
     "dev:stop": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./dev.ps1 -Stop",
     "build": "tsc -b && vite build",
+    "test": "vitest run",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write ."
@@ -90,6 +92,7 @@
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
+    "vitest": "^3.2.4",
     "vite": "^8.2.0"
   }
 }

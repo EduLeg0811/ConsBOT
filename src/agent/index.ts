@@ -13,9 +13,9 @@
  *   1. ChatWindow monta <AgentActions /> e <AgentStatus />;
  *   2. SettingsFields monta <AgentSettingsSection />;
  *   3. chat-settings.ts carrega `agent: AgentSettings`, um bloco opaco;
- *   4. ChatWindow chama triageAgent() antes de enviar: ela decide se a
- *      mensagem vai ao modelo completo, e devolve o bloco de contexto quando
- *      houver. Com o módulo desligado, devolve bypass sem tocar em rede.
+ *   4. ChatWindow chama triageAgent() antes de enviar: Luna decide uma das
+ *      rotas fixas (direta, modelo principal ou corpus). Com o módulo
+ *      desligado, devolve o caminho completo sem tocar na classificação.
  *
  *  Acrescentar capacidade ou preferência ao agente não deve tocar em nenhum
  *  dos quatro. Se tocar, a fronteira vazou.
@@ -28,5 +28,13 @@ export { AgentActions } from "@/agent/ui/AgentActions";
 export { AgentStatus } from "@/agent/ui/AgentStatus";
 export { triageAgent, type AgentTriage } from "@/agent/planner/triage";
 export { AgentSettingsSection } from "@/agent/ui/AgentSettingsSection";
-export { AGENT_SETTINGS_DEFAULT, type AgentSettings } from "@/agent/settings";
+export { executeAgentAction } from "@/agent/tools/registry";
+export { sourceListAnswer, sourceListErrorAnswer } from "@/agent/tools/list-sources";
+export {
+  AGENT_SETTINGS_DEFAULT,
+  normalizeAgentSettings,
+  type AgentPresentation,
+  type AgentSettings,
+} from "@/agent/settings";
 export type { AgentEvent, AgentHost } from "@/agent/host";
+export type { AgentAction, AgentPlanOrigin, AgentRoute } from "@/agent/types";

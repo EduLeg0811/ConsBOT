@@ -39,7 +39,8 @@ export function SettingsDialog({ settings, onSave }: Props) {
         <DialogHeader>
           <DialogTitle>Configurações do ConsBOT</DialogTitle>
           <DialogDescription>
-            Escolha o modelo, ajuste os parâmetros e defina o prompt de sistema.
+            Escolha perfil, aprofundamento e formato; ajuste os parâmetros avançados quando
+            necessário.
           </DialogDescription>
         </DialogHeader>
 

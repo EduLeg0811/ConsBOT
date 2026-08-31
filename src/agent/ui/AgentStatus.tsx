@@ -2,39 +2,15 @@ import { Bot } from "lucide-react";
 
 import type { AgentSettings } from "@/agent/settings";
 
-type Props = { settings: AgentSettings; isAdmin?: boolean };
+type Props = { settings: AgentSettings; isAdmin?: boolean; bypassed?: boolean };
 
-const STATUS_DETECTION_LABELS: Record<string, string> = {
-  rules: "Rules",
-  llm: "LLM",
-};
-
-/** Formas curtas dos rótulos canônicos de AGENT_LLM_MODES — «Abrir módulo»,
- * «Busca Integrada», «Alimentar LLM» —, para a linha caber ao lado do status
- * do RAG sem inventar um terceiro vocabulário para os mesmos três modos. */
-const STATUS_ACTION_LABELS: Record<string, string> = {
-  link: "Abrir",
-  api: "Busca",
-  context: "Alimentar",
-};
-
-/** Linha de parâmetros do módulo, ao lado do eco da pergunta.
- *
- * Fica junto do status do RAG porque responde à mesma pergunta: com que
- * configuração aquela mensagem foi processada. Visível apenas no modo ADMIN
- * (ACCESS_LEVEL = 1) e quando o módulo está ligado.
- */
-export function AgentStatus({ settings, isAdmin }: Props) {
+/** Linha compacta e factual das condições usadas no turno. */
+export function AgentStatus({ settings, isAdmin, bypassed = false }: Props) {
   if (!isAdmin || !settings.enabled) return null;
-
-  const detectionLabel = STATUS_DETECTION_LABELS[settings.detection] ?? settings.detection;
-  const effectiveAction = settings.detection === "llm" ? settings.action : "link";
-  const actionLabel = STATUS_ACTION_LABELS[effectiveAction] ?? effectiveAction;
-
   return (
     <div className="mt-0.5 flex items-center justify-end gap-1 pr-1 text-[11px] leading-relaxed text-muted-foreground/55">
       <Bot className="size-3 shrink-0" aria-hidden="true" />
-      <span>{["Agent Mode", detectionLabel, actionLabel].filter(Boolean).join(" ● ")}</span>
+      <span>{bypassed ? "Agent Mode · não acionado (Recupera Corpus)" : "Agent Mode ● Luna · None"}</span>
     </div>
   );
 }

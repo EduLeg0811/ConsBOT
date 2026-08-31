@@ -1,297 +1,89 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, RefreshCw, Search } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
-import { AgentCard } from "@/agent/ui/AgentCard";
-import { planAgent } from "@/agent/planner/plan";
-import { detectActions } from "@/agent/planner/rules";
-import { executeAgentAction, recallCard } from "@/agent/tools/registry";
 import type { AgentHost } from "@/agent/host";
 import type { AgentSettings } from "@/agent/settings";
 import type {
   AgentAction,
-  AgentCard as AgentCardData,
-  AgentContext,
-  AgentIntentId,
   AgentMessage,
 } from "@/agent/types";
-
-/** Concatena o texto das mensagens do papel indicado, da última para trás.
- * Devolve também o id, que serve de chave de recálculo no modo `llm`. */
-function lastMessageOf(messages: AgentMessage[], role: "user" | "assistant") {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (!message || message.role !== role) continue;
-
-    const text = message.parts
-      .filter((part) => part.type === "text")
-      .map((part) => (part.type === "text" ? part.text : ""))
-      .join(" ")
-      .trim();
-
-    if (text) return { id: message.id, text };
-  }
-
-  return null;
-}
-
-function indexOfLastUser(messages: AgentMessage[]): number {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (messages[index]?.role === "user") return index;
-  }
-  return messages.length;
-}
-
-type CardState = { loading: boolean; error: string | null; card: AgentCardData | null };
-
 type Props = {
   threadId: string;
   settings: AgentSettings;
   host: AgentHost;
-  messages: AgentMessage[];
-  fullAnswerQuestion?: string;
-  onFullAnswer?: (question: string) => void;
+  /** Mensagens completas, usadas pela apresentação Citações para o último turno. */
+  messages?: AgentMessage[];
+  /** Turno específico, usado pela apresentação Clássico sob a resposta correspondente. */
+  userMessage?: AgentMessage | null;
+  expandedByDefault?: boolean;
 };
 
-/** Botões opcionais de ação sugerida (módulo AGENT).
- *
- * Com `settings.enabled` desligado devolve null antes de qualquer trabalho —
- * é por isso que o ChatWindow pode montar este componente incondicionalmente,
- * sem `if`. O padrão de `enabled` vem de AGENT_MODE (ver agent/config.ts).
- */
+function latestUser(messages: AgentMessage[]) {
+  return [...messages].reverse().find((message) => message.role === "user") ?? null;
+}
+
+function textOf(message: AgentMessage | null): string {
+  return (
+    message?.parts
+      .filter((part) => part.type === "text")
+      .map((part) => part.text ?? "")
+      .join(" ")
+      .trim() ?? ""
+  );
+}
+
+function actionsOf(message: AgentMessage | null): AgentAction[] {
+  const metadata = message?.metadata;
+  if (!metadata || typeof metadata !== "object" || !("agentPlan" in metadata)) return [];
+  const actions = (metadata as { agentPlan?: { actions?: unknown } }).agentPlan?.actions;
+  if (!Array.isArray(actions)) return [];
+  return actions.filter(
+    (action): action is AgentAction =>
+      Boolean(action) &&
+      typeof action === "object" &&
+      typeof (action as AgentAction).id === "string" &&
+      typeof (action as AgentAction).label === "string" &&
+      typeof (action as AgentAction).href === "string",
+  );
+}
+
+/** Ações são decididas uma única vez por Luna e lidas do metadata do turno. */
 export function AgentActions({
   threadId,
   settings,
   host,
   messages,
-  fullAnswerQuestion,
-  onFullAnswer,
+  userMessage,
+  expandedByDefault = false,
 }: Props) {
-  const user = lastMessageOf(messages, "user");
-  // A resposta anterior À PERGUNTA ATUAL, não a última da thread: depois de
-  // uma resposta curta da triagem, a última seria a desta mesma pergunta, e o
-  // plano seria recalculado com outra chave de cache — uma chamada a mais.
-  const assistant = lastMessageOf(messages.slice(0, indexOfLastUser(messages)), "assistant");
-  const enabled = settings.enabled;
-  const detection = settings.detection;
-  // O botão abre o card em vez de outra aba nos dois modos que consultam a
-  // API. Em «Alimentar LLM» a consulta já aconteceu antes da resposta,
-  // e o botão serve para VER o que alimentou — sem repetir a busca.
-  // Sob a detecção por Regras o botão é sempre link.
-  const cardMode = detection === "llm" && settings.action !== "link";
-  const english = host.english;
-
-  // O contexto muda de identidade a cada render (ThreadPage remonta as settings
-  // fora do admin); guardá-lo em ref mantém os efeitos presos ao que de fato
-  // importa — a mensagem e o modo —, sem disparar uma classificação por render.
-  const ctxRef = useRef<AgentContext>({ userText: "", settings, host, threadId });
-  ctxRef.current = {
-    userText: user?.text ?? "",
-    assistantText: assistant?.text,
-    settings,
-    host,
-    threadId,
-  };
-
-  const ruleActions = useMemo(
-    () => (enabled && detection === "rules" ? detectActions(ctxRef.current) : []),
-    // `user.text` é a entrada real de detectActions; ctxRef acompanha.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [enabled, detection, user?.text, host.english],
-  );
-
-  const currentUserKey = user ? `${user.id}:${user.text}` : null;
-  const [prevUserKey, setPrevUserKey] = useState<string | null>(currentUserKey);
-  const [llmActions, setLlmActions] = useState<AgentAction[]>([]);
-  const [cards, setCards] = useState<Record<string, CardState>>({});
-
-  // O marco da mensagem em curso, também em ref: as promessas de busca
-  // precisam saber, quando voltarem, se ainda estão falando da mesma pergunta.
-  const userKeyRef = useRef<string | null>(currentUserKey);
-  // Buscas em voo desta mensagem, para cancelar quando ela deixar de ser a
-  // atual. Sem isto, o resultado chegava depois da troca e o card da pergunta
-  // anterior aparecia embaixo da nova.
-  const inFlightRef = useRef(new Map<AgentIntentId, AbortController>());
-
-  if (currentUserKey !== prevUserKey) {
-    setPrevUserKey(currentUserKey);
-    setLlmActions([]);
-    setCards({});
-    userKeyRef.current = currentUserKey;
-    for (const controller of inFlightRef.current.values()) controller.abort();
-    inFlightRef.current.clear();
-  }
-
-  // Sair da tela cancela o que ficou em voo — nenhuma resposta a caminho de um
-  // componente desmontado.
-  useEffect(() => {
-    const inFlight = inFlightRef.current;
-    return () => {
-      for (const controller of inFlight.values()) controller.abort();
-      inFlight.clear();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!enabled || detection !== "llm" || !user?.id) {
-      setLlmActions([]);
-      return;
-    }
-
-    // Um plano por mensagem do usuário. `planAgent` guarda o último, e é o
-    // mesmo que a triagem já pediu antes do envio — aqui só se colhe o
-    // resultado, sem uma segunda chamada.
-    let current = true;
-    void planAgent(ctxRef.current).then((plan) => {
-      if (current) setLlmActions(plan.actions);
-    });
-
-    return () => {
-      current = false;
-    };
-  }, [enabled, detection, user?.id, user?.text]);
-
-  // Trocar o modo de ação invalida os cards abertos: o botão passou a
-  // prometer outra coisa. (Quem zera a cada mensagem é o bloco do marco,
-  // acima — este efeito cuida só da troca de modo.)
-  useEffect(() => {
-    setCards({});
-  }, [cardMode]);
-
-  const openExternal = useCallback(
-    (action: AgentAction, via: "link" | "api" | "card-footer") => {
-      host.logEvent({ intent: action.id, via, detection, meta: action.meta });
-      window.open(action.href, "_blank", "noopener,noreferrer");
-    },
-    [detection, host],
-  );
-
-  const runSearch = useCallback(
-    (action: AgentAction) => {
-      // No modo «Alimentar LLM» esta consulta já foi feita antes da resposta;
-      // então o card abre na hora, sem ir à rede de novo.
-      const known = recallCard(action, ctxRef.current);
-      if (known) {
-        setCards((current) => ({
-          ...current,
-          [action.id]: { loading: false, error: null, card: known },
-        }));
-        host.logEvent({ intent: action.id, via: "api", detection, meta: action.meta });
-        return;
-      }
-
-      setCards((current) => ({
-        ...current,
-        [action.id]: { loading: true, error: null, card: null },
-      }));
-
-      host.logEvent({ intent: action.id, via: "api", detection, meta: action.meta });
-
-      // O marco da pergunta que originou ESTA busca. Quando a resposta voltar,
-      // só entra na tela se ainda for a pergunta em curso.
-      const key = userKeyRef.current;
-      const controller = new AbortController();
-      inFlightRef.current.get(action.id)?.abort();
-      inFlightRef.current.set(action.id, controller);
-
-      const settle = (state: CardState) => {
-        if (inFlightRef.current.get(action.id) === controller) {
-          inFlightRef.current.delete(action.id);
-        }
-        if (userKeyRef.current !== key) return;
-        setCards((current) => ({ ...current, [action.id]: state }));
-      };
-
-      void executeAgentAction(action, ctxRef.current, controller.signal)
-        .then((card) => settle({ loading: false, error: null, card }))
-        .catch(() => {
-          // Abortada — ou a pergunta mudou (e o reset do marco já limpou a
-          // tela), ou um clique novo tomou o lugar deste. Nos dois casos quem
-          // manda na tela é outro, e escrever aqui apagaria o trabalho dele.
-          if (controller.signal.aborted) {
-            if (inFlightRef.current.get(action.id) === controller) {
-              inFlightRef.current.delete(action.id);
-            }
-            return;
-          }
-          settle({
-            loading: false,
-            card: null,
-            error: english
-              ? "Could not reach the search service."
-              : "Não foi possível consultar o serviço de busca.",
-          });
-        });
-    },
-    [detection, english, host],
-  );
-
-  const actions = detection === "llm" ? llmActions : ruleActions;
-
-  if (!enabled || (actions.length === 0 && !fullAnswerQuestion)) return null;
-
+  const user = userMessage ?? latestUser(messages ?? []);
+  // A decisão pertence ao turno gravado. Alterar o interruptor depois não deve
+  // apagar pills nem o card de fontes de uma resposta já existente.
+  const actions = actionsOf(user);
+  const externalActions = actions.filter((action) => action.kind === "open-url");
+  if (externalActions.length === 0) return null;
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        {fullAnswerQuestion && onFullAnswer ? (
-          <button
-            type="button"
-            onClick={() => onFullAnswer(fullAnswerQuestion)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs font-chat text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-          >
-            <RefreshCw className="size-3.5 shrink-0" aria-hidden="true" />
-            <span>{english ? "Full answer" : "Resposta completa"}</span>
-          </button>
-        ) : null}
-
-        {actions.map((action) =>
-          cardMode ? (
-            <button
-              key={action.id}
-              type="button"
-              title={
-                english ? "Searches and shows the result here" : "Busca e mostra o resultado aqui"
-              }
-              disabled={cards[action.id]?.loading}
-              onClick={() => runSearch(action)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-chart-2/40 bg-chart-2/10 px-3 py-1.5 text-xs font-chat text-foreground transition-colors hover:border-chart-2/60 hover:bg-chart-2/20 disabled:opacity-50"
-            >
-              <Search className="size-3.5 shrink-0" aria-hidden="true" />
-              <span>{action.label}</span>
-            </button>
-          ) : (
-            <a
-              key={action.id}
-              href={action.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={action.title}
-              onClick={() =>
-                host.logEvent({ intent: action.id, via: "link", detection, meta: action.meta })
-              }
-              className="inline-flex items-center gap-1.5 rounded-full border border-chart-2/40 bg-chart-2/10 px-3 py-1.5 text-xs font-chat text-foreground transition-colors hover:border-chart-2/60 hover:bg-chart-2/20"
-            >
-              <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
-              <span>{action.label}</span>
-            </a>
-          ),
-        )}
-      </div>
-
-      {cardMode
-        ? actions
-            .filter((action) => cards[action.id])
-            .map((action) => (
-              <AgentCard
-                key={`card-${action.id}`}
-                action={action}
-                card={cards[action.id]?.card ?? null}
-                loading={cards[action.id]?.loading ?? false}
-                error={cards[action.id]?.error ?? null}
-                english={english}
-                onOpenExternal={() => openExternal(action, "card-footer")}
-              />
-            ))
-        : null}
+    <div className="flex flex-wrap items-center gap-2">
+      {externalActions.map((action) => (
+        <a
+          key={action.id}
+          href={action.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={action.title}
+          onClick={() =>
+            host.logEvent({
+              intent: action.id,
+              via: "link",
+              detection: "llm",
+              meta: action.meta,
+            })
+          }
+          className="inline-flex items-center gap-1.5 rounded-full border border-chart-2/40 bg-chart-2/10 px-3 py-1.5 text-xs font-chat text-foreground transition-colors hover:border-chart-2/60 hover:bg-chart-2/20"
+        >
+          <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+          <span>{action.label}</span>
+        </a>
+      ))}
     </div>
   );
 }

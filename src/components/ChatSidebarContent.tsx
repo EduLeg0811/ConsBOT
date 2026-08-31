@@ -1,12 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  BookA,
+  BookMarked,
+  BookOpen,
   Check,
   Clipboard,
   Database,
   Eye,
   EyeOff,
+  ExternalLink,
   FileText,
+  Library,
   MessageSquare,
+  PanelRightOpen,
   Pencil,
   RotateCcw,
   Settings2,
@@ -40,9 +46,46 @@ export type ChatSidebarProps = {
   onClearAll: () => void;
   auditLogs: AuditLog[];
   onClearAuditLogs: () => void;
+  onQuickAccess: (link: { title: string; url: string }) => void;
+  citationsPanelAvailable: boolean;
+  citationsPanelOpen: boolean;
+  onCitationsPanelOpenChange: (open: boolean) => void;
   activeTab?: SidebarTab;
   onTabChange?: (tab: SidebarTab) => void;
 };
+
+export const SIDEBAR_QUICK_LINKS = [
+  {
+    title: "Busca em Livros",
+    url: "https://cons-ia.org/index_search_book.html",
+    icon: BookOpen,
+    color: "text-sky-500 dark:text-sky-400",
+  },
+  {
+    title: "Busca em Verbetes",
+    url: "https://cons-ia.org/index_search_verb.html",
+    icon: FileText,
+    color: "text-emerald-500 dark:text-emerald-400",
+  },
+  {
+    title: "Bibliografia de Livros",
+    url: "https://cons-ia.org/index_biblio_wv.html",
+    icon: Library,
+    color: "text-amber-500 dark:text-amber-400",
+  },
+  {
+    title: "Bibliografia de Verbetes",
+    url: "https://cons-ia.org/index_biblio_verbete.html",
+    icon: BookMarked,
+    color: "text-violet-500 dark:text-violet-400",
+  },
+  {
+    title: "Dicionários",
+    url: "https://lexicons.cons-ia.org/",
+    icon: BookA,
+    color: "text-teal-500 dark:text-teal-400",
+  },
+] as const;
 
 function formatThreadDate(timestamp: number) {
   const date = new Date(timestamp);
@@ -51,6 +94,12 @@ function formatThreadDate(timestamp: number) {
     minute: "2-digit",
     hour12: false,
   })}`;
+}
+
+function interactionLabel(value: unknown): string {
+  if (!value || typeof value !== "object") return "Evento de interface";
+  const record = value as Record<string, unknown>;
+  return typeof record.label === "string" && record.label ? record.label : "Evento de interface";
 }
 
 export function ChatSidebarContent({
@@ -66,6 +115,10 @@ export function ChatSidebarContent({
   onClearAll,
   auditLogs,
   onClearAuditLogs,
+  onQuickAccess,
+  citationsPanelAvailable,
+  citationsPanelOpen,
+  onCitationsPanelOpenChange,
   activeTab,
   onTabChange,
 }: ChatSidebarProps) {
@@ -305,6 +358,7 @@ export function ChatSidebarContent({
               </Button>
             ) : null}
           </div>
+          <AgentAuditSummary logs={auditLogs} />
           {auditLogs.length === 0 ? (
             <div className="mx-1 rounded-xl border border-dashed border-border bg-card/60 px-4 py-8 text-center">
               <FileText className="mx-auto mb-2 size-5 text-muted-foreground/60" />
@@ -315,96 +369,150 @@ export function ChatSidebarContent({
             </div>
           ) : (
             <div className="space-y-2">
-              {auditLogs.map((log) => (
-                <details
-                  key={log.id}
-                  className="group rounded-xl border border-border bg-card shadow-[0_5px_16px_-14px_rgba(25,70,50,0.45)]"
-                  open={log.status === "streaming"}
-                >
-                  <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
-                    <span
-                      className={cn(
-                        "size-2 rounded-full",
-                        log.status === "complete"
-                          ? "bg-emerald-500"
-                          : log.status === "error"
-                            ? "bg-red-500"
-                            : log.status === "cancelled"
-                              ? "bg-zinc-400"
-                              : "animate-pulse bg-amber-500",
-                      )}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-semibold">
-                        {log.status === "complete"
-                          ? "Concluída"
-                          : log.status === "error"
-                            ? "Com erro"
-                            : log.status === "cancelled"
-                              ? "Interrompida"
-                              : "Em andamento"}
+              {auditLogs.map((log) =>
+                log.kind === "interaction" ? (
+                  <details
+                    key={log.id}
+                    className="group rounded-xl border border-sky-200/80 bg-sky-50/55 dark:border-sky-900/60 dark:bg-sky-950/15"
+                  >
+                    <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
+                      <span className="size-2 shrink-0 rounded-full bg-sky-500" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs font-semibold text-foreground">
+                          {interactionLabel(log.request)}
+                        </span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          Evento de interface ·{" "}
+                          {new Date(log.startedAt).toLocaleTimeString("pt-BR")}
+                        </span>
                       </span>
-                      <span className="block text-[11px] text-muted-foreground">
-                        {new Date(log.startedAt).toLocaleString("pt-BR", {
-                          dateStyle: "short",
-                          timeStyle: "medium",
-                        })}
+                      <span className="text-xs text-muted-foreground transition-transform group-open:rotate-45">
+                        +
                       </span>
-                    </span>
-                    <span className="text-xs text-muted-foreground transition-transform group-open:rotate-45">
-                      +
-                    </span>
-                  </summary>
-                  <div className="space-y-3 border-t border-border/70 px-3 py-3">
-                    <RagAuditStatus log={log} />
-                    {log.openaiRequest ? (
+                    </summary>
+                    <div className="border-t border-sky-200/70 px-3 py-3 dark:border-sky-900/50">
                       <AuditBlock
-                        label="Chamada OpenAI · /v1/responses"
-                        value={log.openaiRequest}
-                        onCopy={() => void copyLog(log.openaiRequest)}
-                      />
-                    ) : (
-                      <AuditBlock
-                        label="Payload da aplicação · POST /api/llm"
+                        label="Detalhes da ação"
                         value={log.request}
                         onCopy={() => void copyLog(log.request)}
                       />
-                    )}
-                    {log.response ? (
-                      <AuditBlock
-                        label={log.openaiRequest ? "Resposta OpenAI" : "Resposta recebida · legado"}
-                        value={log.response}
-                        onCopy={() => void copyLog(log.response)}
+                    </div>
+                  </details>
+                ) : (
+                  <details
+                    key={log.id}
+                    className="group rounded-xl border border-border bg-card shadow-[0_5px_16px_-14px_rgba(25,70,50,0.45)]"
+                    open={log.status === "streaming"}
+                  >
+                    <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
+                      <span
+                        className={cn(
+                          "size-2 rounded-full",
+                          log.status === "complete"
+                            ? "bg-emerald-500"
+                            : log.status === "error"
+                              ? "bg-red-500"
+                              : log.status === "cancelled"
+                                ? "bg-zinc-400"
+                                : "animate-pulse bg-amber-500",
+                        )}
                       />
-                    ) : (
-                      <p className="text-xs italic text-muted-foreground">
-                        Aguardando resposta da LLM…
-                      </p>
-                    )}
-                    {log.openaiRequest ? (
-                      <details className="rounded-lg border border-border/70 bg-secondary/35 px-2.5 py-2">
-                        <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
-                          Ver payload da aplicação e mensagem da interface
-                        </summary>
-                        <div className="mt-3 space-y-3">
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-semibold">
+                          {log.status === "complete"
+                            ? "Concluída"
+                            : log.status === "error"
+                              ? "Com erro"
+                              : log.status === "cancelled"
+                                ? "Interrompida"
+                                : "Em andamento"}
+                        </span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          {new Date(log.startedAt).toLocaleString("pt-BR", {
+                            dateStyle: "short",
+                            timeStyle: "medium",
+                          })}
+                        </span>
+                      </span>
+                      <span className="text-xs text-muted-foreground transition-transform group-open:rotate-45">
+                        +
+                      </span>
+                    </summary>
+                    <div className="space-y-3 border-t border-border/70 px-3 py-3">
+                      <RagAuditStatus log={log} />
+                      {log.agentPills?.length ? (
+                        <div className="space-y-2 rounded-lg border border-chart-2/25 bg-chart-2/5 px-2.5 py-2">
+                          <p className="text-[11px] font-medium text-foreground">
+                            Pills disponibilizados
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {log.agentPills.map((pill) => (
+                              <span
+                                key={pill.id}
+                                className="rounded-full border border-chart-2/30 bg-card px-2 py-0.5 text-[10px] text-foreground"
+                              >
+                                {pill.label}
+                              </span>
+                            ))}
+                          </div>
                           <AuditBlock
-                            label="Aplicação · POST /api/llm"
-                            value={log.request}
-                            onCopy={() => void copyLog(log.request)}
+                            label="Metadados dos pills"
+                            value={log.agentPills}
+                            onCopy={() => void copyLog(log.agentPills)}
                           />
-                          {log.uiResponse ? (
-                            <AuditBlock
-                              label="Mensagem convertida para UI"
-                              value={log.uiResponse}
-                              onCopy={() => void copyLog(log.uiResponse)}
-                            />
-                          ) : null}
                         </div>
-                      </details>
-                    ) : null}
-                  </div>
-                </details>
-              ))}
+                      ) : null}
+                      {log.openaiRequest ? (
+                        <AuditBlock
+                          label="Chamada OpenAI · /v1/responses"
+                          value={log.openaiRequest}
+                          onCopy={() => void copyLog(log.openaiRequest)}
+                        />
+                      ) : (
+                        <AuditBlock
+                          label="Payload da aplicação · POST /api/llm"
+                          value={log.request}
+                          onCopy={() => void copyLog(log.request)}
+                        />
+                      )}
+                      {log.response ? (
+                        <AuditBlock
+                          label={
+                            log.openaiRequest ? "Resposta OpenAI" : "Resposta recebida · legado"
+                          }
+                          value={log.response}
+                          onCopy={() => void copyLog(log.response)}
+                        />
+                      ) : (
+                        <p className="text-xs italic text-muted-foreground">
+                          Aguardando resposta da LLM…
+                        </p>
+                      )}
+                      {log.openaiRequest ? (
+                        <details className="rounded-lg border border-border/70 bg-secondary/35 px-2.5 py-2">
+                          <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
+                            Ver payload da aplicação e mensagem da interface
+                          </summary>
+                          <div className="mt-3 space-y-3">
+                            <AuditBlock
+                              label="Aplicação · POST /api/llm"
+                              value={log.request}
+                              onCopy={() => void copyLog(log.request)}
+                            />
+                            {log.uiResponse ? (
+                              <AuditBlock
+                                label="Mensagem convertida para UI"
+                                value={log.uiResponse}
+                                onCopy={() => void copyLog(log.uiResponse)}
+                              />
+                            ) : null}
+                          </div>
+                        </details>
+                      ) : null}
+                    </div>
+                  </details>
+                ),
+              )}
             </div>
           )}
         </div>
@@ -412,7 +520,29 @@ export function ChatSidebarContent({
 
       {tab === "settings" ? (
         <TooltipProvider delayDuration={250}>
-          <div className="flex justify-end px-3 pb-2">
+          <div className="flex justify-end gap-1 px-3 pb-2">
+            {citationsPanelAvailable ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    aria-label={
+                      citationsPanelOpen ? "Fechar painel de citações" : "Abrir painel de citações"
+                    }
+                    onClick={() => onCitationsPanelOpenChange(!citationsPanelOpen)}
+                  >
+                    <PanelRightOpen className={citationsPanelOpen ? "rotate-180" : undefined} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-52 bg-popover text-center text-[11px] leading-snug text-popover-foreground">
+                  {citationsPanelOpen
+                    ? "Fechar o painel de citações."
+                    : "Abrir o painel de citações."}
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -434,6 +564,38 @@ export function ChatSidebarContent({
           </div>
         </TooltipProvider>
       ) : null}
+
+      <div className="border-t border-sidebar-border bg-sidebar px-3 py-2 space-y-0.5">
+        <p className="px-3 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+          Acesso rápido
+        </p>
+        {SIDEBAR_QUICK_LINKS.map(({ title, url, icon: Icon, color }) => (
+          <Button
+            key={title}
+            variant="ghost"
+            size="sm"
+            asChild
+            className="group w-full justify-start gap-2 text-xs font-medium text-foreground/90 hover:bg-sidebar-accent hover:text-foreground active:bg-sidebar-accent"
+          >
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={title}
+              onClick={() => onQuickAccess({ title, url })}
+            >
+              <Icon
+                className={cn(
+                  "size-4 shrink-0 transition-transform duration-150 group-hover:scale-110",
+                  color,
+                )}
+              />
+              <span className="truncate">{title}</span>
+              <ExternalLink className="ml-auto size-3 shrink-0 opacity-30 transition-opacity duration-150 group-hover:opacity-75" />
+            </a>
+          </Button>
+        ))}
+      </div>
 
       <div className="border-t border-sidebar-border bg-sidebar px-3 py-3">
         <Button
@@ -459,6 +621,101 @@ function hasFileSearchExecution(value: unknown): boolean {
   const toolName = typeof record.toolName === "string" ? record.toolName : "";
   if (type === "file_search_call" || toolName === "fileSearch") return true;
   return Object.values(record).some(hasFileSearchExecution);
+}
+
+type AgentAuditDecision = { route: string; origin?: string; confidence?: number; actionCount?: number };
+
+function agentDecisionFromLog(log: AuditLog): AgentAuditDecision | null {
+  const request = log.request;
+  if (!request || typeof request !== "object") return null;
+  const record = request as Record<string, unknown>;
+
+  if (record.action === "classifier_decision" && record.meta && typeof record.meta === "object") {
+    const meta = record.meta as Record<string, unknown>;
+    return typeof meta.route === "string"
+      ? {
+          route: meta.route,
+          ...(typeof meta.origin === "string" ? { origin: meta.origin } : {}),
+          ...(typeof meta.confidence === "number" ? { confidence: meta.confidence } : {}),
+          ...(Array.isArray(meta.actions) ? { actionCount: meta.actions.length } : {}),
+        }
+      : null;
+  }
+
+  const body = record.body;
+  if (!body || typeof body !== "object") return null;
+  const decision = (body as Record<string, unknown>).agentDecision;
+  if (!decision || typeof decision !== "object") return null;
+  const value = decision as Record<string, unknown>;
+  return typeof value.route === "string"
+    ? {
+        route: value.route,
+        ...(typeof value.origin === "string" ? { origin: value.origin } : {}),
+        ...(typeof value.confidence === "number" ? { confidence: value.confidence } : {}),
+        ...(Array.isArray(value.actions) ? { actionCount: value.actions.length } : {}),
+      }
+    : null;
+}
+
+function AgentAuditSummary({ logs }: { logs: AuditLog[] }) {
+  const decisions = useMemo(
+    () =>
+      logs
+        .filter((log) => log.kind === "interaction")
+        .map(agentDecisionFromLog)
+        .filter((value): value is AgentAuditDecision => value !== null),
+    [logs],
+  );
+  if (decisions.length === 0) return null;
+
+  const counts = decisions.reduce<Record<string, number>>((result, decision) => {
+    result[decision.route] = (result[decision.route] ?? 0) + 1;
+    return result;
+  }, {});
+  const fallbacks = decisions.filter((decision) => decision.origin === "fallback").length;
+  const availablePills = decisions.reduce((total, decision) => total + (decision.actionCount ?? 0), 0);
+  const pillClicks = logs.filter((log) => {
+    const request = log.request;
+    return (
+      log.kind === "interaction" &&
+      Boolean(request) &&
+      typeof request === "object" &&
+      (request as Record<string, unknown>).action === "pill_click"
+    );
+  }).length;
+  const averageConfidence =
+    decisions.reduce((total, decision) => total + (decision.confidence ?? 0), 0) / decisions.length;
+
+  return (
+    <section className="mx-1 mb-3 rounded-xl border border-chart-2/20 bg-chart-2/5 px-3 py-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-[11px] font-semibold text-foreground">Resumo do roteador</p>
+        <span className="text-[10px] text-muted-foreground">
+          confiança média {Math.round(averageConfidence * 100)}%
+        </span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {Object.entries(counts).map(([route, count]) => (
+          <span
+            key={route}
+            className="rounded-full border border-chart-2/25 bg-card px-2 py-0.5 text-[10px] text-foreground"
+          >
+            {route}: {count}
+          </span>
+        ))}
+        {fallbacks > 0 ? (
+          <span className="rounded-full border border-amber-300/70 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-800">
+            fallback: {fallbacks}
+          </span>
+        ) : null}
+        {availablePills > 0 ? (
+          <span className="rounded-full border border-border/70 bg-card px-2 py-0.5 text-[10px] text-muted-foreground">
+            pills: {pillClicks}/{availablePills} clicados
+          </span>
+        ) : null}
+      </div>
+    </section>
+  );
 }
 
 function RagAuditStatus({ log }: { log: AuditLog }) {

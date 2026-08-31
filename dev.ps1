@@ -1,5 +1,5 @@
 # dev.ps1 — sobe o Main-Server (FastAPI) e o frontend (Vite) neste terminal.
-#   .\dev.ps1                            -> Main-Server em ..\Main-Server + Vite
+#   .\dev.ps1                            -> MainServer em ..\MainServer + Vite
 #   .\dev.ps1 -NoServer                  -> só o Vite, contra um Main-Server já rodando em 127.0.0.1:8000
 #   .\dev.ps1 -ServerPath D:\outro\path  -> Main-Server em outro diretório
 #   .\dev.ps1 -ServerPort 8010           -> porta do Main-Server (default: 8000, o mesmo default de
@@ -106,7 +106,7 @@ function Get-LaunchArgs {
 
 # Localizar o Main-Server
 if (-not $ServerPath) {
-    $ServerPath = Join-Path (Split-Path $root -Parent) "Main-Server"
+    $ServerPath = Join-Path (Split-Path $root -Parent) "MainServer"
 }
 $serverScript = Join-Path $ServerPath "run_dev.ps1"
 

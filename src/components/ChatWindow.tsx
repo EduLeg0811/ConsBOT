@@ -14,6 +14,7 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import { AgentClassifierTraceCard, TurnSettingsSummary } from "@/components/TurnDiagnostics";
 import {
   PromptInput,
   PromptInputSubmit,
@@ -22,20 +23,43 @@ import {
 import {
   MODELS,
   PROFILES,
+  RESPONSE_DEPTHS,
+  buildSystemPrompt,
   isEnglishVectorStore,
-  systemPromptWithVerbosity,
+  targetWordsForSettings,
+  verbosityForDepth,
   VECTOR_STORES,
   type ChatSettings,
 } from "@/lib/chat-settings";
 import { API_BASE } from "@/lib/main-server";
 import { logFeatureAccess } from "@/lib/access-log";
-import { AgentActions, AgentStatus, triageAgent, type AgentHost } from "@/agent";
+import {
+  AgentActions,
+  AgentStatus,
+  executeAgentAction,
+  sourceListAnswer,
+  sourceListErrorAnswer,
+  triageAgent,
+  type AgentAction,
+  type AgentHost,
+  type AgentTriage,
+} from "@/agent";
+import { fetchVectorStoreFiles } from "@/lib/vector-store-files";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  lexicalQueryForContext,
+  retrieveSemanticContext,
+  semanticErrorTurn,
+  type SemanticContextTurn,
+} from "@/lib/semantic-context";
 import type {
   AuditCompletion,
+  AuditInteraction,
   AuditLog,
+  AgentPillMetadata,
   ConsBotUIMessage,
   OpenAIAuditEvent,
+  TurnConfigSnapshot,
 } from "@/lib/audit-log";
 
 /** `"none"` in ChatSettings means "sem RAG"; Main-Server takes an empty list
@@ -43,6 +67,52 @@ import type {
  * selected — forcing it with nothing to search would be a 400. */
 function vectorStoresFor(vectorStoreId: ChatSettings["vectorStoreId"]) {
   return vectorStoreId === "none" ? [] : [vectorStoreId];
+}
+
+/** Recuperação documental manual: nunca entra no prompt do modelo. */
+function shouldRetrieveSemanticCorpus(settings: ChatSettings): boolean {
+  return settings.retrievalMode === "corpus";
+}
+
+function semanticAuditMeta(context: SemanticContextTurn | null) {
+  if (!context) return {};
+  return {
+    semantic_status: context.status,
+    semantic_requested_sources: context.requestedSourceIds,
+    semantic_processed_sources: context.processedSourceIds,
+    semantic_returned_count: context.results.length,
+    semantic_total_found: context.totalFound,
+    semantic_duration_ms: context.durationMs,
+    semantic_failed_sources: context.failedSources.map((failure) => failure.sourceId),
+    ...(context.error ? { semantic_error: context.error } : {}),
+  };
+}
+
+function pillsForAudit(actions: AgentAction[]): AgentPillMetadata[] {
+  return actions.filter((action) => action.kind === "open-url").map((action) => ({
+    id: action.id,
+    label: action.label,
+    link: action.href,
+    ...(action.meta ? { parameters: action.meta } : {}),
+  }));
+}
+
+function agentAuditMeta(triage: AgentTriage | null) {
+  if (!triage || triage.origin === "bypass") return {};
+  return {
+    agent_route: triage.mode,
+    agent_proposed_route: triage.proposedRoute ?? triage.mode,
+    agent_origin: triage.origin,
+    agent_confidence: triage.confidence,
+    agent_reason: triage.reason,
+    agent_action_count: triage.actions.length,
+    ...(triage.durationMs === undefined ? {} : { agent_duration_ms: triage.durationMs }),
+  };
+}
+
+function agentPresentationForTurn(message: ConsBotUIMessage | undefined): "citations" | "classic" {
+  const plan = message?.metadata?.agentPlan;
+  return plan?.presentation === "classic" ? "classic" : "citations";
 }
 
 const REASONING_LABELS: Record<ChatSettings["reasoningEffort"], string> = {
@@ -54,11 +124,29 @@ const REASONING_LABELS: Record<ChatSettings["reasoningEffort"], string> = {
   max: "Max Effort",
 };
 
-const VERBOSITY_LABELS: Record<ChatSettings["textVerbosity"], string> = {
-  low: "Baixo",
-  medium: "Médio",
-  high: "Alto",
-};
+function turnConfigSnapshot(settings: ChatSettings): TurnConfigSnapshot {
+  const profile = PROFILES.find((item) => item.id === (settings.profile ?? "tutor"));
+  const model = MODELS.find((item) => item.id === settings.model);
+  const depth = RESPONSE_DEPTHS.find((item) => item.id === settings.responseDepth);
+  const vectorStore = VECTOR_STORES.find((item) => item.id === settings.vectorStoreId);
+  const responseFormat =
+    settings.responseFormat === "conscienciological" ? "Confor Cons" : "ChatGPT";
+  return {
+    model: model?.label.replace("ConsBOT ", "") ?? settings.model,
+    profile: profile?.label ?? "Tutor",
+    reasoning: REASONING_LABELS[settings.reasoningEffort],
+    responseDepth: depth?.label ?? "Equilibrada",
+    targetWords: targetWordsForSettings(settings),
+    responseFormat,
+    vectorStore: vectorStore?.label ?? settings.vectorStoreId,
+    retrieval: settings.retrievalMode ?? "standard",
+    semanticSources: (settings.semanticSourceIds ?? []).map((id) => id.toUpperCase()),
+    agent: {
+      enabled: settings.agent.enabled,
+      presentation: settings.agent.presentation ?? "citations",
+    },
+  };
+}
 
 /** Limite máximo de caracteres por prompt enviado no chat */
 export const MAX_PROMPT_LENGTH = 4000;
@@ -226,17 +314,6 @@ function newMessageId(): string {
     : `m-${Math.random().toString(36).slice(2)}-${Date.now()}`;
 }
 
-/** A pergunta guardada numa resposta curta da triagem, quando é uma. */
-function directQuestion(message: ConsBotUIMessage): string {
-  const meta = message.metadata;
-  return meta &&
-    typeof meta === "object" &&
-    "agentDirect" in meta &&
-    typeof meta.agentDirect === "string"
-    ? meta.agentDirect
-    : "";
-}
-
 type PendingAccessLog = {
   action: string;
   label: string;
@@ -253,6 +330,7 @@ type Props = {
   onMessagesChange: (messages: ConsBotUIMessage[]) => void;
   onAuditStart: (request: unknown) => string;
   onAuditComplete: (id: string, result: AuditCompletion, status?: AuditLog["status"]) => void;
+  onAuditInteraction: (event: AuditInteraction) => void;
   isAdmin?: boolean;
 };
 
@@ -269,6 +347,7 @@ export function ChatWindow({
   onMessagesChange,
   onAuditStart,
   onAuditComplete,
+  onAuditInteraction,
   isAdmin = false,
 }: Props) {
   const isMobile = useIsMobile();
@@ -305,20 +384,22 @@ export function ChatWindow({
   // interface precisa para não parecer ociosa nesse intervalo.
   const submittingRef = useRef(false);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [preparationStage, setPreparationStage] = useState<"triage" | "semantic" | "sources">("triage");
+  const preparationAbortRef = useRef<AbortController | null>(null);
+  const preparationCancelledRef = useRef(false);
+  const pendingEchoIdRef = useRef<string | null>(null);
+  const pendingAgentPillsRef = useRef<AgentPillMetadata[]>([]);
   const auditCompleteRef = useRef(onAuditComplete);
   const initialUrlQuestionProcessedRef = useRef(false);
   auditCompleteRef.current = onAuditComplete;
-
-  // Bloco que o módulo AGENT injeta no prompt desta requisição, no modo
-  // «Alimentar LLM». Vazio em todos os outros casos — inclusive quando o
-  // planejador decide que a resposta não depende de busca exata.
-  const agentContextRef = useRef("");
 
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const activeModel = MODELS.find((model) => model.id === settings.model);
   const activeVectorStore = VECTOR_STORES.find((store) => store.id === settings.vectorStoreId);
   const activeProfile = PROFILES.find((profile) => profile.id === (settings.profile ?? "tutor"));
+  const activeDepth = RESPONSE_DEPTHS.find((depth) => depth.id === settings.responseDepth);
+  const targetWords = targetWordsForSettings(settings);
   const isEnglish = isEnglishVectorStore(settings.vectorStoreId);
 
   // Contrato do módulo AGENT com o ConsBOT: é por aqui que ele alcança a API,
@@ -328,30 +409,39 @@ export function ChatWindow({
     () => ({
       apiBase: API_BASE,
       english: isEnglish,
-      logEvent: (event) =>
+      vectorStoreId: settings.vectorStoreId,
+      loadActiveSourceFiles: () => fetchVectorStoreFiles(settings.vectorStoreId),
+      logEvent: (event) => (
         logFeatureAccess({
           module: "consbot",
-          action: "agent_action",
-          label: "Ação sugerida",
+          action: event.via === "api" ? "agent_action" : "pill_click",
+          label: event.via === "api" ? "Ação interna do Agent" : "Pill do Agent",
           value: event.intent,
           chat_id: threadId,
-          meta: { rule: event.intent, detection: event.detection, via: event.via, ...event.meta },
+          meta: { intent: event.intent, detection: event.detection, via: event.via, ...event.meta },
         }),
+        onAuditInteraction({
+          module: "consbot",
+          action: event.via === "api" ? "agent_action" : "pill_click",
+          label: event.via === "api" ? "Ação interna do Agent" : "Pill do Agent",
+          value: event.intent,
+          meta: { intent: event.intent, detection: event.detection, via: event.via, ...event.meta },
+        })
+      ),
     }),
-    [isEnglish, threadId],
+    [isEnglish, onAuditInteraction, settings.vectorStoreId, threadId],
   );
   const llmParameters = [
     `GPT-5.6 ${activeModel?.label.replace("ConsBOT ", "") ?? "Terra"}`,
     activeProfile?.label ?? "Tutor",
     !isMobile ? REASONING_LABELS[settings.reasoningEffort] : undefined,
-    { low: "Low verbosity", medium: "Medium verbosity", high: "High verbosity" }[
-      settings.textVerbosity
-    ],
+    activeDepth?.label ?? "Equilibrada",
     settings.vectorStoreId === "none"
       ? isEnglish
         ? "No RAG"
         : "Sem RAG"
       : activeVectorStore?.label,
+    (settings.retrievalMode ?? "standard") === "corpus" ? "Recupera Corpus" : undefined,
     settings.responseFormat === "conscienciological" ? "Confor Cons" : "ChatGPT",
   ].filter((parameter): parameter is string => Boolean(parameter));
 
@@ -390,10 +480,9 @@ export function ChatWindow({
               // do server-side, now run here before the request leaves the browser.
               messages: await convertToModelMessages(messages),
               model: settingsRef.current.model,
-              systemPrompt:
-                systemPromptWithVerbosity(settingsRef.current) + agentContextRef.current,
+              systemPrompt: buildSystemPrompt(settingsRef.current),
               reasoningEffort: settingsRef.current.reasoningEffort,
-              verbosity: settingsRef.current.textVerbosity,
+              verbosity: verbosityForDepth(settingsRef.current.responseDepth),
               vectorStores,
               // `vectorMaxResults` só significa algo com file_search ativo, e
               // vai junto do toolChoice para o corpo não afirmar mais do que
@@ -436,6 +525,7 @@ export function ChatWindow({
           pendingAccessLogRef.current = null;
         }
         streamStartedRef.current = false;
+        pendingAgentPillsRef.current = [];
         if (pendingAuditId.current) {
           auditCompleteRef.current(
             pendingAuditId.current,
@@ -496,7 +586,6 @@ export function ChatWindow({
     const assistantText = isFresh && lastAssistant ? getMessageText(lastAssistant) : "";
     const first10Lines = assistantText ? getFirstLines(assistantText, 10) : undefined;
     streamStartedRef.current = false;
-
     if (pendingAccessLogRef.current) {
       logFeatureAccess({
         module: "consbot",
@@ -514,6 +603,17 @@ export function ChatWindow({
 
     if (pendingAuditId.current) {
       if (isFresh && lastAssistant) {
+        const agentPills = pendingAgentPillsRef.current;
+        const assistantWithPills = agentPills.length
+          ? { ...lastAssistant, metadata: { ...lastAssistant.metadata, agentPills } }
+          : lastAssistant;
+        if (agentPills.length) {
+          setMessages((existing) =>
+            existing.map((message) =>
+              message.id === lastAssistant.id ? assistantWithPills : message,
+            ),
+          );
+        }
         onAuditComplete(pendingAuditId.current, {
           openaiRequest: openaiAuditRef.current?.request,
           response: openaiAuditRef.current
@@ -524,7 +624,8 @@ export function ChatWindow({
                 usage: openaiAuditRef.current.usage,
               }
             : { aviso: "O stream terminou sem metadados de auditoria da OpenAI." },
-          uiResponse: lastAssistant,
+          uiResponse: assistantWithPills,
+          ...(agentPills.length ? { agentPills } : {}),
         });
       } else {
         onAuditComplete(
@@ -534,12 +635,13 @@ export function ChatWindow({
         );
       }
       pendingAuditId.current = null;
+      pendingAgentPillsRef.current = [];
       openaiAuditRef.current = null;
     }
-  }, [isBusy, messages, onAuditComplete]);
+  }, [isBusy, messages, onAuditComplete, setMessages]);
 
   const submit = useCallback(
-    async (text: string, forceFull = false) => {
+    async (text: string) => {
       const value = text.trim();
       // `isBusy` só passa a valer quando o sendMessage vai à rede, e antes
       // dele há uma triagem que pode levar segundos. Sem esta trava, um
@@ -557,6 +659,10 @@ export function ChatWindow({
       }
       submittingRef.current = true;
       setIsPreparing(true);
+      setPreparationStage("triage");
+      preparationCancelledRef.current = false;
+      const preparationController = new AbortController();
+      preparationAbortRef.current = preparationController;
       try {
         openaiAuditRef.current = null;
         // Marco desta rodada: a resposta que já está na tela. Enquanto a última
@@ -566,6 +672,7 @@ export function ChatWindow({
           .reverse()
           .find((message) => message.role === "assistant")?.id;
         const current = settingsRef.current;
+        const configSnapshot = turnConfigSnapshot(current);
         const store = VECTOR_STORES.find((item) => item.id === current.vectorStoreId);
         const telemetryMeta = {
           model: MODELS.find((item) => item.id === current.model)?.label ?? current.model,
@@ -575,7 +682,9 @@ export function ChatWindow({
           // então registra-se o formato, que o identifica sem inflar o log.
           response_format: current.responseFormat,
           reasoning_effort: current.reasoningEffort,
-          verbosity: current.textVerbosity,
+          response_depth: current.responseDepth,
+          target_words: targetWordsForSettings(current),
+          verbosity: verbosityForDepth(current.responseDepth),
           ...(vectorStoresFor(current.vectorStoreId).length > 0
             ? { vector_max_results: current.vectorMaxResults }
             : {}),
@@ -588,34 +697,203 @@ export function ChatWindow({
         // nenhuma, e esperar a triagem para exibi-lo deixava a tela parada por
         // um segundo depois do envio — como se nada tivesse acontecido.
         const echoId = newMessageId();
+        pendingEchoIdRef.current = echoId;
         const historico = lastAssistantText(messages);
+        const previousUser = [...messages].reverse().find((message) => message.role === "user");
+        const previousUserText = previousUser ? getMessageText(previousUser) : "";
         setMessages((existing) => [
           ...existing,
-          { id: echoId, role: "user", parts: [{ type: "text", text: value }] },
+          {
+            id: echoId,
+            role: "user",
+            parts: [{ type: "text", text: value }],
+            metadata: { ragVectorStoreId: current.vectorStoreId, turnConfig: configSnapshot },
+          },
         ]);
 
-        // Triagem: o único ponto em que o módulo interfere no fluxo. Com o Modo
-        // Agente desligado devolve bypass sem tocar em rede, e daqui para baixo
-        // tudo se comporta como antes dele existir.
-        const triage = forceFull
-          ? { mode: "full" as const, answer: "", context: "" }
-          : await triageAgent({
-              userText: value,
-              assistantText: historico,
-              settings: settingsRef.current.agent,
-              host: agentHost,
-              threadId,
-            });
+        // Recupera Corpus é uma operação manual, determinística e sem LLM:
+        // não classifica, não cria pills e não chama o modelo principal.
+        const manualCorpus = shouldRetrieveSemanticCorpus(current);
+        const agentContext = {
+          userText: value,
+          assistantText: historico,
+          previousUserText,
+          semanticSourceIds: current.semanticSourceIds,
+          hasFileSearch: vectorStoresFor(current.vectorStoreId).length > 0,
+          settings: settingsRef.current.agent,
+          host: agentHost,
+          threadId,
+        };
+        const triage = manualCorpus
+          ? null
+          : await triageAgent(agentContext);
 
-        // A auditoria abre DEPOIS da triagem porque é aqui que o systemPrompt
-        // fica conhecido: no modo «Alimentar LLM» ele leva o bloco de consulta
-        // às bases, e auditar o prompt sem esse bloco descrevia uma requisição
-        // diferente da que sai.
-        const systemPrompt = systemPromptWithVerbosity(current) + triage.context;
-        // Vale para o envio e para um eventual «tentar novamente» deste turno.
-        // Fica aqui, e não só no caminho completo, para que uma resposta direta
-        // não deixe o bloco da rodada anterior pendurado no ref.
-        agentContextRef.current = triage.context;
+        if (preparationCancelledRef.current) return;
+
+        const classifierTrace = triage?.classifierResponse
+          ? { model: "ConsBOT Luna", response: triage.classifierResponse }
+          : undefined;
+        const agentPlan = triage && triage.origin !== "bypass"
+          ? {
+              route: triage!.mode,
+              actions: triage!.actions,
+              presentation: current.agent.presentation ?? "citations",
+              confidence: triage.confidence,
+              reason: triage.reason,
+              origin: triage.origin,
+              ...(triage.proposedRoute ? { proposedRoute: triage.proposedRoute } : {}),
+              ...(triage.durationMs === undefined ? {} : { durationMs: triage.durationMs }),
+            }
+          : undefined;
+        const agentPills = pillsForAudit(agentPlan?.actions ?? []);
+        if (agentPlan) {
+          onAuditInteraction({
+            module: "agent",
+            action: "classifier_decision",
+            label: "Decisão do classificador",
+            value: agentPlan.route,
+            meta: {
+              route: agentPlan.route,
+              proposed_route: agentPlan.proposedRoute ?? agentPlan.route,
+              origin: agentPlan.origin,
+              confidence: agentPlan.confidence,
+              reason: agentPlan.reason,
+              actions: agentPlan.actions.map((action) => action.id),
+              presentation: agentPlan.presentation,
+              ...(agentPlan.durationMs === undefined ? {} : { duration_ms: agentPlan.durationMs }),
+            },
+          });
+        }
+        if (classifierTrace || agentPlan) {
+          setMessages((existing) =>
+            existing.map((message) =>
+              message.id === echoId
+                ? {
+                    ...message,
+                    metadata: {
+                      ...message.metadata,
+                      ...(classifierTrace ? { agentClassifier: classifierTrace } : {}),
+                      ...(agentPlan ? { agentPlan } : {}),
+                    },
+                  }
+                : message,
+            ),
+          );
+        }
+
+        // Defesa em profundidade: mesmo se uma resposta inválida de Luna escapar
+        // da normalização do planejador, Clássico nunca consulta o corpus.
+        const classicAgent = current.agent.presentation === "classic";
+        const useCorpus = manualCorpus || (!classicAgent && triage?.mode === "corpus");
+        const willAnswerDirectly =
+          manualCorpus || triage?.mode === "direct" || triage?.mode === "clarify" || useCorpus;
+        let semanticContext: SemanticContextTurn | null = null;
+
+        if (useCorpus) {
+          setPreparationStage("semantic");
+          if (current.semanticSourceIds.length === 0) {
+            semanticContext = semanticErrorTurn(
+              value,
+              [],
+              new Error("Nenhuma fonte semântica foi selecionada para a recuperação do corpus."),
+            );
+            semanticContext.retrievalMode = "corpus";
+          } else {
+            try {
+              semanticContext = await retrieveSemanticContext({
+                query: value,
+                lexicalQuery: lexicalQueryForContext(value),
+                sourceIds: current.semanticSourceIds,
+                limit: current.semanticContextLimit,
+                signal: preparationController.signal,
+                retrievalMode: "corpus",
+              });
+            } catch (error) {
+              if (preparationCancelledRef.current) return;
+              throw error;
+            }
+          }
+        }
+
+        if (preparationCancelledRef.current) return;
+
+        if (willAnswerDirectly) {
+          let directAnswer = manualCorpus
+            ? isEnglish
+              ? "The relevant corpus excerpts are shown below."
+              : "Os trechos relevantes do corpus estão apresentados abaixo."
+            : (triage?.answer ?? "");
+          const sourceListAction =
+            triage?.mode === "direct"
+              ? triage.actions.find(
+                  (action) => action.kind === "inline-result" && action.id === "list_sources",
+                )
+              : undefined;
+          if (sourceListAction) {
+            setPreparationStage("sources");
+            agentHost.logEvent({
+              intent: sourceListAction.id,
+              via: "api",
+              detection: "llm",
+              meta: sourceListAction.meta,
+            });
+            try {
+              const sourceList = await executeAgentAction(
+                sourceListAction,
+                agentContext,
+                preparationController.signal,
+              );
+              if (preparationCancelledRef.current) return;
+              directAnswer = sourceListAnswer(
+                sourceList,
+                isEnglish,
+                current.vectorStoreId !== "none",
+              );
+            } catch {
+              if (preparationCancelledRef.current) return;
+              directAnswer = sourceListErrorAnswer(isEnglish);
+            }
+          }
+          logFeatureAccess({
+            module: "consbot",
+            action: "ask",
+            label: "Pergunta ao ConsBOT",
+            value,
+            chat_id: threadId,
+            meta: {
+              ...telemetryMeta,
+              agent_route: manualCorpus ? "manual_corpus" : useCorpus ? "corpus" : "direct",
+              ...agentAuditMeta(triage),
+              ...semanticAuditMeta(semanticContext),
+              response: getFirstLines(directAnswer, 10),
+            },
+          });
+          const directMessage: ConsBotUIMessage = {
+            id: newMessageId(),
+            role: "assistant",
+            parts: [{ type: "text", text: directAnswer }],
+            metadata: {
+              ...(semanticContext ? { semanticContext } : {}),
+              ...(agentPills.length ? { agentPills } : {}),
+            },
+          };
+          setMessages((existing) => [
+            ...existing.map((message) =>
+              message.id === echoId && semanticContext
+                ? {
+                    ...message,
+                    metadata: { ...message.metadata, semanticContext },
+                  }
+                : message,
+            ),
+            directMessage,
+          ]);
+          pendingEchoIdRef.current = null;
+
+          return;
+        }
+
+        const systemPrompt = buildSystemPrompt(current);
         pendingAuditId.current = onAuditStart({
           endpoint: `${API_BASE}/api/llm`,
           sentAt: new Date().toISOString(),
@@ -625,7 +903,10 @@ export function ChatWindow({
             vectorStores: vectorStoresFor(current.vectorStoreId),
             systemPrompt,
             reasoningEffort: current.reasoningEffort,
-            verbosity: current.textVerbosity,
+            response_depth: current.responseDepth,
+            target_words: targetWordsForSettings(current),
+            verbosity: verbosityForDepth(current.responseDepth),
+            ...(agentPlan ? { agentDecision: agentPlan } : {}),
             ...(vectorStoresFor(current.vectorStoreId).length > 0
               ? { vectorMaxResults: current.vectorMaxResults }
               : {}),
@@ -633,53 +914,19 @@ export function ChatWindow({
           },
         });
 
-        // A triagem resolveu sozinha: a resposta é curta e a busca vem nos pills.
-        // Só intercepta para exibir a resposta curta e o pill «Resposta completa»
-        // se a opção fullAnswer estiver configurada como "pill".
-        // No padrão ("auto"), a chamada ao modelo completo segue diretamente.
-        const allowDirect = settingsRef.current.agent.fullAnswer === "pill";
-        if (!forceFull && allowDirect && triage.mode === "direct") {
-          logFeatureAccess({
-            module: "consbot",
-            action: "ask",
-            label: "Pergunta ao ConsBOT",
-            value,
-            chat_id: threadId,
-            meta: {
-              ...telemetryMeta,
-              response: getFirstLines(triage.answer, 10),
-            },
-          });
-          const directMessage: ConsBotUIMessage = {
-            id: newMessageId(),
-            role: "assistant",
-            parts: [{ type: "text", text: triage.answer }],
-            metadata: { agentDirect: value },
-          };
-          setMessages((existing) => [...existing, directMessage]);
-
-          // Nenhuma chamada saiu: a auditoria aberta acima fecha aqui mesmo. Sem
-          // isto ela ficava `streaming` para sempre, descrevendo uma requisição
-          // que nunca aconteceu.
-          if (pendingAuditId.current) {
-            onAuditComplete(pendingAuditId.current, {
-              response: {
-                origem: "triagem do módulo AGENT",
-                aviso: "Respondida pela triagem; nenhuma chamada à OpenAI foi feita.",
-              },
-              uiResponse: directMessage,
-            });
-            pendingAuditId.current = null;
-          }
-          return;
-        }
-
         pendingAccessLogRef.current = {
           action: "ask",
           label: "Pergunta ao ConsBOT",
           value,
           chat_id: threadId,
           meta: telemetryMeta,
+        };
+        pendingAccessLogRef.current.meta = {
+          ...pendingAccessLogRef.current.meta,
+          agent_route: triage?.mode ?? "full",
+          retrieval_mode: current.retrievalMode,
+          ...agentAuditMeta(triage),
+          ...semanticAuditMeta(semanticContext),
         };
 
         // O caminho completo passa pelo transporte, que insere a mensagem do
@@ -690,22 +937,33 @@ export function ChatWindow({
         // não caem no mesmo lote. Some se um dia o SDK aceitar reaproveitar o
         // id do eco; até lá, um quadro é melhor que a pergunta duplicada.
         setMessages((existing) => existing.filter((message) => message.id !== echoId));
+        pendingEchoIdRef.current = null;
+        pendingAgentPillsRef.current = agentPills;
 
         void sendMessage({
           text: value,
-          metadata: { ragVectorStoreId: settingsRef.current.vectorStoreId },
+          metadata: {
+            ragVectorStoreId: current.vectorStoreId,
+            turnConfig: configSnapshot,
+            ...(classifierTrace ? { agentClassifier: classifierTrace } : {}),
+            ...(agentPlan ? { agentPlan } : {}),
+          },
         });
       } finally {
         // A partir daqui quem sinaliza atividade é o `status` do useChat.
         submittingRef.current = false;
         setIsPreparing(false);
+        if (preparationAbortRef.current === preparationController) {
+          preparationAbortRef.current = null;
+        }
       }
     },
     [
       agentHost,
       isBusy,
       messages,
-      onAuditComplete,
+      isEnglish,
+      onAuditInteraction,
       onAuditStart,
       sendMessage,
       setMessages,
@@ -713,21 +971,6 @@ export function ChatWindow({
     ],
   );
 
-  // Refaz a pergunta pelo caminho completo. Descarta o par que a triagem
-  // criou — pergunta e resposta curta — para a conversa não ficar com a mesma
-  // pergunta duas vezes; o sendMessage recria a mensagem do usuário.
-  const askFullAnswer = useCallback(
-    (question: string) => {
-      setMessages((current) => {
-        const trimmed = [...current];
-        if (trimmed.at(-1)?.role === "assistant") trimmed.pop();
-        if (trimmed.at(-1)?.role === "user") trimmed.pop();
-        return trimmed;
-      });
-      void submit(question, true);
-    },
-    [setMessages, submit],
-  );
   useEffect(() => {
     const query =
       searchParams.get("question") ||
@@ -914,11 +1157,12 @@ export function ChatWindow({
   }, [isBusy, messages.length, refreshSuggestions, settings.vectorStoreId]);
 
   const regenerateWithAudit = () => {
-    if (isBusy) return;
+    if (isBusy || isPreparing) return;
     const current = settingsRef.current;
     const store = VECTOR_STORES.find((item) => item.id === current.vectorStoreId);
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     const userText = lastUser ? getMessageText(lastUser) : "";
+    if (!lastUser || !userText) return;
     pendingAccessLogRef.current = {
       action: "regenerate",
       label: "Regeneração de resposta",
@@ -929,10 +1173,13 @@ export function ChatWindow({
         vector_store: store?.label ?? current.vectorStoreId,
         response_format: current.responseFormat,
         reasoning_effort: current.reasoningEffort,
-        verbosity: current.textVerbosity,
+        response_depth: current.responseDepth,
+        target_words: targetWordsForSettings(current),
+        verbosity: verbosityForDepth(current.responseDepth),
         ...(vectorStoresFor(current.vectorStoreId).length > 0
           ? { vector_max_results: current.vectorMaxResults }
           : {}),
+        retrieval_mode: current.retrievalMode,
       },
     };
     openaiAuditRef.current = null;
@@ -944,19 +1191,35 @@ export function ChatWindow({
         messages,
         model: settingsRef.current.model,
         vectorStores: vectorStoresFor(settingsRef.current.vectorStoreId),
-        systemPrompt: systemPromptWithVerbosity(settingsRef.current),
+        systemPrompt: buildSystemPrompt(settingsRef.current),
         reasoningEffort: settingsRef.current.reasoningEffort,
-        verbosity: settingsRef.current.textVerbosity,
+        response_depth: settingsRef.current.responseDepth,
+        target_words: targetWordsForSettings(settingsRef.current),
+        verbosity: verbosityForDepth(settingsRef.current.responseDepth),
         ...(vectorStoresFor(settingsRef.current.vectorStoreId).length > 0
           ? { vectorMaxResults: settingsRef.current.vectorMaxResults }
           : {}),
         stream: true,
       },
     });
+    baselineAssistantIdRef.current = [...messages]
+      .reverse()
+      .find((message) => message.role === "assistant")?.id;
+    streamStartedRef.current = false;
     void regenerate();
   };
 
   const stopWithAudit = () => {
+    preparationCancelledRef.current = true;
+    preparationAbortRef.current?.abort();
+    preparationAbortRef.current = null;
+    submittingRef.current = false;
+    setIsPreparing(false);
+    if (pendingEchoIdRef.current) {
+      const echoId = pendingEchoIdRef.current;
+      pendingEchoIdRef.current = null;
+      setMessages((existing) => existing.filter((message) => message.id !== echoId));
+    }
     if (pendingAccessLogRef.current) {
       const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
       const assistantText = lastAssistant ? getMessageText(lastAssistant) : "";
@@ -1024,278 +1287,314 @@ export function ChatWindow({
 
   return (
     <main
-      className={`mx-auto flex w-full ${containerWidthClass} flex-1 flex-col overflow-hidden px-4 transition-all duration-300`}
+      className={`mx-auto flex w-full ${containerWidthClass} flex-1 overflow-hidden transition-all duration-300`}
     >
-      <Conversation className="flex-1">
-        <ConversationContent className="gap-5 pt-4 pb-6 sm:pt-12">
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 pt-0 sm:gap-6 sm:pt-4">
-              <div className="flex flex-col items-center gap-2 text-center">
-                {/* 22px no mobile e 40px no desktop */}
-                <h2 className="font-display text-[24px] font-normal leading-[1.2] text-foreground sm:text-[42px]">
-                  {isEnglishVectorStore(settings.vectorStoreId) ? (
-                    <>
-                      Artificial Intelligence
-                      <br />
-                      <span className="italic text-primary/80">in Service of Consciousness</span>
-                    </>
-                  ) : (
-                    <>
-                      Inteligência Artificial
-                      <br />
-                      <span className="italic text-primary/80">a serviço da Consciência</span>
-                    </>
-                  )}
-                </h2>
-              </div>
+      <div className="flex min-w-0 flex-1 flex-col px-4">
+        <Conversation className="flex-1">
+          <ConversationContent className="gap-5 pt-4 pb-6 sm:pt-12">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 pt-0 sm:gap-6 sm:pt-4">
+                <div className="flex flex-col items-center gap-2 text-center">
+                  {/* 22px no mobile e 40px no desktop */}
+                  <h2 className="font-display text-[24px] font-normal leading-[1.2] text-foreground sm:text-[42px]">
+                    {isEnglishVectorStore(settings.vectorStoreId) ? (
+                      <>
+                        Artificial Intelligence
+                        <br />
+                        <span className="italic text-primary/80">in Service of Consciousness</span>
+                      </>
+                    ) : (
+                      <>
+                        Inteligência Artificial
+                        <br />
+                        <span className="italic text-primary/80">a serviço da Consciência</span>
+                      </>
+                    )}
+                  </h2>
+                </div>
 
-              {!hasInitialUrlQuestion.current ? (
-                <>
-                  <div className="-mb-3 flex w-full justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="rounded-full text-muted-foreground/70 hover:bg-primary/10 hover:text-primary"
-                      aria-label={
-                        isEnglishVectorStore(settings.vectorStoreId)
-                          ? "Generate new initial questions"
-                          : "Gerar novas perguntas iniciais"
+                {!hasInitialUrlQuestion.current ? (
+                  <>
+                    <div className="-mb-3 flex w-full justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="rounded-full text-muted-foreground/70 hover:bg-primary/10 hover:text-primary"
+                        aria-label={
+                          isEnglishVectorStore(settings.vectorStoreId)
+                            ? "Generate new initial questions"
+                            : "Gerar novas perguntas iniciais"
+                        }
+                        title={
+                          isEnglishVectorStore(settings.vectorStoreId)
+                            ? "Generate new questions"
+                            : "Gerar novas perguntas"
+                        }
+                        onClick={() => void refreshSuggestions()}
+                        disabled={isRefreshingSuggestions || isBusy}
+                      >
+                        <RefreshCw
+                          className={isRefreshingSuggestions ? "animate-spin" : undefined}
+                        />
+                      </Button>
+                    </div>
+                    {suggestions.length > 0 ? (
+                      <div className="grid w-full gap-2 sm:grid-cols-2">
+                        {suggestions.slice(0, 4).map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() => void submit(suggestion)}
+                            className="rounded-xl border border-border bg-card/80 px-3.5 py-2 text-left text-xs font-chat text-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+
+            {messages.map((message, messageIndex) => {
+              const precedingUser =
+                message.role === "assistant" ? messages[messageIndex - 1] : undefined;
+              const classicAgentTurn =
+                precedingUser?.role === "user" &&
+                agentPresentationForTurn(precedingUser) === "classic";
+              const waitingForThisAssistant = isBusy && messageIndex === messages.length - 1;
+              const ragStatus =
+                message.role === "user"
+                  ? getRagStatus(
+                      message,
+                      messages[messageIndex + 1],
+                      settings.vectorStoreId,
+                      sourceCounts,
+                    )
+                  : null;
+              const manualCorpusTurn =
+                message.role === "user" &&
+                typeof message.metadata === "object" &&
+                message.metadata !== null &&
+                "turnConfig" in message.metadata &&
+                (message.metadata.turnConfig as TurnConfigSnapshot | undefined)?.retrieval ===
+                  "corpus";
+              return (
+                <div key={message.id} className="w-full">
+                  <Message from={message.role}>
+                    <MessageContent
+                      className={
+                        message.role === "user"
+                          ? "bg-chat-user text-chat-user-foreground rounded-2xl px-4 py-3"
+                          : "bg-transparent px-0 text-foreground"
                       }
-                      title={
-                        isEnglishVectorStore(settings.vectorStoreId)
-                          ? "Generate new questions"
-                          : "Gerar novas perguntas"
-                      }
-                      onClick={() => void refreshSuggestions()}
-                      disabled={isRefreshingSuggestions || isBusy}
                     >
-                      <RefreshCw className={isRefreshingSuggestions ? "animate-spin" : undefined} />
-                    </Button>
-                  </div>
-                  {suggestions.length > 0 ? (
-                    <div className="grid w-full gap-2 sm:grid-cols-2">
-                      {suggestions.slice(0, 4).map((suggestion) => (
-                        <button
-                          key={suggestion}
-                          type="button"
-                          onClick={() => void submit(suggestion)}
-                          className="rounded-xl border border-border bg-card/80 px-3.5 py-2 text-left text-xs font-chat text-foreground transition-colors hover:bg-muted hover:text-foreground active:bg-muted sm:rounded-2xl sm:px-4 sm:py-3 sm:text-sm"
-                        >
-                          {suggestion}
-                        </button>
-                      ))}
+                      {message.parts.map((part, index) => {
+                        if (part.type === "reasoning" && part.text.trim().length > 0) {
+                          return (
+                            <details
+                              key={`${message.id}-r-${index}`}
+                              className="mb-2 rounded-xl border border-border/70 bg-secondary/60 px-3 py-2 text-xs font-chat text-muted-foreground"
+                            >
+                              <summary className="cursor-pointer font-medium">Raciocínio</summary>
+                              <div className="mt-2 whitespace-pre-wrap">{part.text}</div>
+                            </details>
+                          );
+                        }
+                        if (part.type === "text") {
+                          const text =
+                            message.role === "assistant" &&
+                            settings.responseFormat === "conscienciological"
+                              ? normalizeConscienciologicalLists(part.text)
+                              : part.text;
+
+                          return (
+                            <MessageResponse
+                              key={`${message.id}-t-${index}`}
+                              responseFormat={settings.responseFormat}
+                            >
+                              {text}
+                            </MessageResponse>
+                          );
+                        }
+                        if (part.type === "tool-fileSearch") {
+                          return null;
+                        }
+                        // Os documentos recuperados pelo File Search são suporte interno da
+                        // resposta. As referências bibliográficas exibidas vêm somente do texto
+                        // final produzido pela LLM, evitando duplicação na seção Referências.
+                        if (part.type === "source-document") return null;
+                        return null;
+                      })}
+                    </MessageContent>
+                  </Message>
+                  {ragStatus ? (
+                    <div className="mt-1 flex items-center justify-end gap-1 pr-1 text-[11px] leading-relaxed text-muted-foreground/55">
+                      <Database className="size-3 shrink-0" aria-hidden="true" />
+                      <span>{ragStatus}</span>
                     </div>
                   ) : null}
-                </>
+                  {message.role === "user" ? (
+                    <>
+                      <TurnSettingsSummary metadata={message.metadata} />
+                      <AgentClassifierTraceCard metadata={message.metadata} />
+                      <AgentStatus
+                        settings={settings.agent}
+                        isAdmin={isAdmin}
+                        bypassed={manualCorpusTurn}
+                      />
+                    </>
+                  ) : null}
+                  {message.role === "assistant" &&
+                  precedingUser?.role === "user" &&
+                  classicAgentTurn &&
+                  !waitingForThisAssistant ? (
+                    <div className="mt-2">
+                      <AgentActions
+                        threadId={threadId}
+                        settings={settings.agent}
+                        host={agentHost}
+                        userMessage={precedingUser}
+                        expandedByDefault
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+
+            {status === "submitted" || isPreparing ? (
+              <Shimmer className="text-sm">
+                {preparationStage === "semantic"
+                  ? isEnglish
+                    ? "Retrieving complementary sources..."
+                    : "Consultando fontes complementares..."
+                  : preparationStage === "sources"
+                    ? isEnglish
+                      ? "Loading consultation sources..."
+                      : "Carregando fontes de consulta..."
+                  : isEnglish
+                    ? "Thinking..."
+                    : "Pensando..."}
+              </Shimmer>
+            ) : null}
+
+            {latestAssistantText && !isBusy ? (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="rounded-lg text-muted-foreground hover:text-foreground"
+                  aria-label="Copiar resposta"
+                  title="Copiar resposta"
+                  onClick={() => void copyLatestResponse()}
+                >
+                  <Copy />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="rounded-lg text-muted-foreground hover:text-foreground"
+                  aria-label="Compartilhar resposta"
+                  title="Compartilhar resposta"
+                  onClick={() => void shareLatestResponse()}
+                >
+                  <Share2 />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="rounded-lg text-muted-foreground hover:text-foreground"
+                  aria-label="Tentar novamente"
+                  title="Tentar novamente"
+                  onClick={() => void regenerateWithAudit()}
+                >
+                  <RefreshCw />
+                </Button>
+              </div>
+            ) : null}
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
+
+        <div className="pb-9 sm:pb-5">
+          <PromptInput
+            className="[&_[data-slot=input-group]]:rounded-[28px] [&_[data-slot=input-group]]:border-border/70 [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-[0_3px_14px_-5px_oklch(0.3_0.02_155/0.22)]"
+            onSubmit={(message, event) => {
+              event.preventDefault();
+              const text = (message.text || input).trim();
+              if (text.length > MAX_PROMPT_LENGTH) {
+                toast.error(
+                  isEnglish
+                    ? `Message is too long (${text.length.toLocaleString()} chars). Maximum limit is ${MAX_PROMPT_LENGTH.toLocaleString()} characters.`
+                    : `O texto é muito longo (${text.length.toLocaleString()} caracteres). O limite máximo é de ${MAX_PROMPT_LENGTH.toLocaleString()} caracteres.`,
+                );
+                return;
+              }
+              void submit(text);
+            }}
+          >
+            <PromptInputTextarea
+              ref={textareaRef}
+              value={input}
+              onChange={(event) => {
+                const val = event.target.value;
+                setInput(val);
+                if (!hasTyped && val.length > 0) {
+                  setHasTyped(true);
+                }
+                if (val.length > MAX_PROMPT_LENGTH && input.length <= MAX_PROMPT_LENGTH) {
+                  toast.warning(
+                    isEnglish
+                      ? `Text exceeds the ${MAX_PROMPT_LENGTH.toLocaleString()} character limit. Please shorten your prompt.`
+                      : `O texto excede o limite de ${MAX_PROMPT_LENGTH.toLocaleString()} caracteres. Por favor, reduza o conteúdo.`,
+                  );
+                }
+              }}
+              className="field-sizing-content max-h-48 min-h-14 resize-none bg-transparent px-5 py-4 text-base font-chat"
+              placeholder={
+                hasTyped
+                  ? ""
+                  : isMobile
+                    ? isEnglishVectorStore(settings.vectorStoreId)
+                      ? "Hello Conscientiologist!"
+                      : "Olá Conscienciólogo!"
+                    : isEnglishVectorStore(settings.vectorStoreId)
+                      ? "Hello Conscientiologist! What would you like to discuss today?"
+                      : "Olá Conscienciólogo! O que você gostaria de conversar hoje?"
+              }
+            />
+            <div className="flex shrink-0 items-center pr-2">
+              <PromptInputSubmit
+                status={isPreparing ? "submitted" : status}
+                disabled={!isBusy && !isPreparing && (input.trim().length === 0 || isOverLimit)}
+                onClick={isBusy || isPreparing ? stopWithAudit : undefined}
+                className="size-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/35 disabled:text-primary-foreground"
+              >
+                {isBusy || isPreparing ? undefined : <ArrowUp className="size-5" />}
+              </PromptInputSubmit>
+            </div>
+          </PromptInput>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-2 text-[11px] text-muted-foreground/60">
+            <div>
+              {input.length > MAX_PROMPT_LENGTH * 0.7 ? (
+                <span
+                  className={
+                    isOverLimit ? "font-semibold text-destructive" : "text-muted-foreground"
+                  }
+                >
+                  {input.length.toLocaleString()} / {MAX_PROMPT_LENGTH.toLocaleString()}{" "}
+                  {isEnglish ? "characters" : "caracteres"}
+                  {isOverLimit && (isEnglish ? " (limit exceeded)" : " (limite excedido)")}
+                </span>
               ) : null}
             </div>
-          ) : null}
-
-          {messages.map((message, messageIndex) => {
-            const ragStatus =
-              message.role === "user"
-                ? getRagStatus(
-                    message,
-                    messages[messageIndex + 1],
-                    settings.vectorStoreId,
-                    sourceCounts,
-                  )
-                : null;
-            return (
-              <div key={message.id} className="w-full">
-                <Message from={message.role}>
-                  <MessageContent
-                    className={
-                      message.role === "user"
-                        ? "bg-chat-user text-chat-user-foreground rounded-2xl px-4 py-3"
-                        : "bg-transparent px-0 text-foreground"
-                    }
-                  >
-                    {message.parts.map((part, index) => {
-                      if (part.type === "reasoning" && part.text.trim().length > 0) {
-                        return (
-                          <details
-                            key={`${message.id}-r-${index}`}
-                            className="mb-2 rounded-xl border border-border/70 bg-secondary/60 px-3 py-2 text-xs font-chat text-muted-foreground"
-                          >
-                            <summary className="cursor-pointer font-medium">Raciocínio</summary>
-                            <div className="mt-2 whitespace-pre-wrap">{part.text}</div>
-                          </details>
-                        );
-                      }
-                      if (part.type === "text") {
-                        const text =
-                          message.role === "assistant" &&
-                          settings.responseFormat === "conscienciological"
-                            ? normalizeConscienciologicalLists(part.text)
-                            : part.text;
-
-                        return (
-                          <MessageResponse
-                            key={`${message.id}-t-${index}`}
-                            responseFormat={settings.responseFormat}
-                          >
-                            {text}
-                          </MessageResponse>
-                        );
-                      }
-                      if (part.type === "tool-fileSearch") {
-                        return null;
-                      }
-                      // Os documentos recuperados pelo File Search são suporte interno da
-                      // resposta. As referências bibliográficas exibidas vêm somente do texto
-                      // final produzido pela LLM, evitando duplicação na seção Referências.
-                      if (part.type === "source-document") return null;
-                      return null;
-                    })}
-                  </MessageContent>
-                </Message>
-                {ragStatus ? (
-                  <div className="mt-1 flex items-center justify-end gap-1 pr-1 text-[11px] leading-relaxed text-muted-foreground/55">
-                    <Database className="size-3 shrink-0" aria-hidden="true" />
-                    <span>{ragStatus}</span>
-                  </div>
-                ) : null}
-                {message.role === "user" ? (
-                  <AgentStatus settings={settings.agent} isAdmin={isAdmin} />
-                ) : null}
-              </div>
-            );
-          })}
-
-          {status === "submitted" || isPreparing ? (
-            <Shimmer className="text-sm">{isEnglish ? "Thinking..." : "Pensando..."}</Shimmer>
-          ) : null}
-
-          {latestAssistantText && !isBusy ? (
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-lg text-muted-foreground hover:text-foreground"
-                aria-label="Copiar resposta"
-                title="Copiar resposta"
-                onClick={() => void copyLatestResponse()}
-              >
-                <Copy />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-lg text-muted-foreground hover:text-foreground"
-                aria-label="Compartilhar resposta"
-                title="Compartilhar resposta"
-                onClick={() => void shareLatestResponse()}
-              >
-                <Share2 />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="rounded-lg text-muted-foreground hover:text-foreground"
-                aria-label="Tentar novamente"
-                title="Tentar novamente"
-                onClick={regenerateWithAudit}
-              >
-                <RefreshCw />
-              </Button>
-            </div>
-          ) : null}
-
-          {/* Módulo AGENT (opt-in): inerte enquanto AGENT_MODE=0. */}
-          <AgentActions
-            threadId={threadId}
-            settings={settings.agent}
-            host={agentHost}
-            messages={messages}
-            fullAnswerQuestion={
-              messages.at(-1)?.role === "assistant" ? directQuestion(messages.at(-1)!) : ""
-            }
-            onFullAnswer={askFullAnswer}
-          />
-        </ConversationContent>
-        <ConversationScrollButton />
-      </Conversation>
-
-      <div className="pb-9 sm:pb-5">
-        <PromptInput
-          className="[&_[data-slot=input-group]]:rounded-[28px] [&_[data-slot=input-group]]:border-border/70 [&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:shadow-[0_3px_14px_-5px_oklch(0.3_0.02_155/0.22)]"
-          onSubmit={(message, event) => {
-            event.preventDefault();
-            const text = (message.text || input).trim();
-            if (text.length > MAX_PROMPT_LENGTH) {
-              toast.error(
-                isEnglish
-                  ? `Message is too long (${text.length.toLocaleString()} chars). Maximum limit is ${MAX_PROMPT_LENGTH.toLocaleString()} characters.`
-                  : `O texto é muito longo (${text.length.toLocaleString()} caracteres). O limite máximo é de ${MAX_PROMPT_LENGTH.toLocaleString()} caracteres.`,
-              );
-              return;
-            }
-            void submit(text);
-          }}
-        >
-          <PromptInputTextarea
-            ref={textareaRef}
-            value={input}
-            onChange={(event) => {
-              const val = event.target.value;
-              setInput(val);
-              if (!hasTyped && val.length > 0) {
-                setHasTyped(true);
-              }
-              if (val.length > MAX_PROMPT_LENGTH && input.length <= MAX_PROMPT_LENGTH) {
-                toast.warning(
-                  isEnglish
-                    ? `Text exceeds the ${MAX_PROMPT_LENGTH.toLocaleString()} character limit. Please shorten your prompt.`
-                    : `O texto excede o limite de ${MAX_PROMPT_LENGTH.toLocaleString()} caracteres. Por favor, reduza o conteúdo.`,
-                );
-              }
-            }}
-            className="field-sizing-content max-h-48 min-h-14 resize-none bg-transparent px-5 py-4 text-base font-chat"
-            placeholder={
-              hasTyped
-                ? ""
-                : isMobile
-                  ? isEnglishVectorStore(settings.vectorStoreId)
-                    ? "Hello Conscientiologist!"
-                    : "Olá Conscienciólogo!"
-                  : isEnglishVectorStore(settings.vectorStoreId)
-                    ? "Hello Conscientiologist! What would you like to discuss today?"
-                    : "Olá Conscienciólogo! O que você gostaria de conversar hoje?"
-            }
-          />
-          <div className="flex shrink-0 items-center pr-2">
-            <PromptInputSubmit
-              status={status}
-              disabled={!isBusy && (isPreparing || input.trim().length === 0 || isOverLimit)}
-              onClick={isBusy ? stopWithAudit : undefined}
-              className="size-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-primary/35 disabled:text-primary-foreground"
-            >
-              {isBusy ? undefined : <ArrowUp className="size-5" />}
-            </PromptInputSubmit>
+            <p className="ml-auto text-right leading-relaxed sm:leading-none">
+              {llmParameters.join("  ●  ")}
+            </p>
           </div>
-        </PromptInput>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-2 text-[11px] text-muted-foreground/60">
-          <div>
-            {input.length > MAX_PROMPT_LENGTH * 0.7 ? (
-              <span
-                className={
-                  isOverLimit
-                    ? "font-semibold text-destructive"
-                    : "text-muted-foreground"
-                }
-              >
-                {input.length.toLocaleString()} / {MAX_PROMPT_LENGTH.toLocaleString()}{" "}
-                {isEnglish ? "characters" : "caracteres"}
-                {isOverLimit &&
-                  (isEnglish ? " (limit exceeded)" : " (limite excedido)")}
-              </span>
-            ) : null}
-          </div>
-          <p className="ml-auto text-right leading-relaxed sm:leading-none">
-            {llmParameters.join("  ●  ")}
-          </p>
         </div>
       </div>
     </main>

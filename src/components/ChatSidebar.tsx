@@ -6,10 +6,10 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/s
 import { ChatSidebarContent, type ChatSidebarProps } from "@/components/ChatSidebarContent";
 
 const MIN_WIDTH = 200;
-const MAX_WIDTH = 500;
+const MAX_WIDTH = 600;
 
 export function ChatSidebar(props: ChatSidebarProps) {
-  const [width, setWidth] = useState(270);
+  const [width, setWidth] = useState(300);
   const draggingRef = useRef(false);
 
   const onPointerDown = useCallback(() => {
