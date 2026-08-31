@@ -480,6 +480,9 @@ export function ChatWindow({
           const vectorStores = vectorStoresFor(settingsRef.current.vectorStoreId);
           return {
             body: {
+              // Identificação para controle de rate limit e telemetria do MainServer
+              app: "consbot",
+              action: pendingAccessLogRef.current?.action || "ask",
               // Main-Server takes plain role/content messages, not UIMessage[]
               // — the same conversion the removed /api/chat function used to
               // do server-side, now run here before the request leaves the browser.
@@ -903,6 +906,8 @@ export function ChatWindow({
           endpoint: `${API_BASE}/api/llm`,
           sentAt: new Date().toISOString(),
           body: {
+            app: "consbot",
+            action: "ask",
             messages: [...messages, { role: "user", parts: [{ type: "text", text: value }] }],
             model: current.model,
             vectorStores: vectorStoresFor(current.vectorStoreId),
@@ -1193,6 +1198,8 @@ export function ChatWindow({
       sentAt: new Date().toISOString(),
       action: "regenerate",
       body: {
+        app: "consbot",
+        action: "regenerate",
         messages,
         model: settingsRef.current.model,
         vectorStores: vectorStoresFor(settingsRef.current.vectorStoreId),
