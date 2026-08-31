@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import {
   isEnglishVectorStore,
+  DEFAULT_SETTINGS,
   DEPTH_WORD_STEP,
   MODELS,
   normalizeDepthWordTarget,
@@ -520,7 +521,7 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
           <Label>Perfil</Label>
           <div className="grid grid-cols-2 gap-2">
             {PROFILES.map((profile) => {
-              const selected = (draft.profile ?? "tutor") === profile.id;
+              const selected = (draft.profile ?? DEFAULT_SETTINGS.profile) === profile.id;
               return (
                 <button
                   className={

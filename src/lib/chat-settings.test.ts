@@ -10,15 +10,15 @@ import {
 } from "@/lib/chat-settings";
 
 describe("chat settings", () => {
-  it("inicializa novas conversas com o preset padrão de tutor", () => {
+  it("inicializa novas conversas com o preset padrão de introdutor", () => {
     expect(DEFAULT_SETTINGS).toMatchObject({
-      profile: "tutor",
+      profile: "introdutor",
       retrievalMode: "standard",
       model: "gpt-5.6-terra",
       reasoningEffort: "low",
-      vectorMaxResults: 10,
-      responseFormat: "conscienciological",
-      responseDepth: "balanced",
+      vectorMaxResults: 5,
+      responseFormat: "chatgpt",
+      responseDepth: "synthetic",
     });
     expect(DEFAULT_SETTINGS.agent).toEqual({
       enabled: true,

@@ -335,7 +335,7 @@ export function settingsForProfile(profile: ProfileId): ChatSettings {
  * Perfis alternativos conservam seus próprios presets; este é o ponto único
  * de inicialização do ConsBOT. */
 export const DEFAULT_SETTINGS: ChatSettings = {
-  ...settingsForProfile("tutor"),
+  ...settingsForProfile("introdutor"),
   retrievalMode: "standard",
 };
 

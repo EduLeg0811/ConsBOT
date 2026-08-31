@@ -21,6 +21,7 @@ import {
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
 import {
+  DEFAULT_SETTINGS,
   MODELS,
   PROFILES,
   RESPONSE_DEPTHS,
@@ -125,7 +126,9 @@ const REASONING_LABELS: Record<ChatSettings["reasoningEffort"], string> = {
 };
 
 function turnConfigSnapshot(settings: ChatSettings): TurnConfigSnapshot {
-  const profile = PROFILES.find((item) => item.id === (settings.profile ?? "tutor"));
+  const profile = PROFILES.find(
+    (item) => item.id === (settings.profile ?? DEFAULT_SETTINGS.profile),
+  );
   const model = MODELS.find((item) => item.id === settings.model);
   const depth = RESPONSE_DEPTHS.find((item) => item.id === settings.responseDepth);
   const vectorStore = VECTOR_STORES.find((item) => item.id === settings.vectorStoreId);
@@ -397,7 +400,9 @@ export function ChatWindow({
   settingsRef.current = settings;
   const activeModel = MODELS.find((model) => model.id === settings.model);
   const activeVectorStore = VECTOR_STORES.find((store) => store.id === settings.vectorStoreId);
-  const activeProfile = PROFILES.find((profile) => profile.id === (settings.profile ?? "tutor"));
+  const activeProfile = PROFILES.find(
+    (profile) => profile.id === (settings.profile ?? DEFAULT_SETTINGS.profile),
+  );
   const activeDepth = RESPONSE_DEPTHS.find((depth) => depth.id === settings.responseDepth);
   const targetWords = targetWordsForSettings(settings);
   const isEnglish = isEnglishVectorStore(settings.vectorStoreId);
@@ -1438,8 +1443,12 @@ export function ChatWindow({
                   ) : null}
                   {message.role === "user" ? (
                     <>
-                      <TurnSettingsSummary metadata={message.metadata} />
-                      <AgentClassifierTraceCard metadata={message.metadata} />
+                      {isAdmin ? (
+                        <>
+                          <TurnSettingsSummary metadata={message.metadata} isAdmin={isAdmin} />
+                          <AgentClassifierTraceCard metadata={message.metadata} isAdmin={isAdmin} />
+                        </>
+                      ) : null}
                       <AgentStatus
                         settings={settings.agent}
                         isAdmin={isAdmin}

@@ -36,7 +36,14 @@ function agentPlanFromMetadata(metadata: unknown) {
   return typeof plan.route === "string" && Array.isArray(plan.actions) ? plan : null;
 }
 
-export function TurnSettingsSummary({ metadata }: { metadata: unknown }) {
+export function TurnSettingsSummary({
+  metadata,
+  isAdmin = true,
+}: {
+  metadata: unknown;
+  isAdmin?: boolean;
+}) {
+  if (!isAdmin) return null;
   const config = turnConfigFromMetadata(metadata);
   if (!config) return null;
 
@@ -70,7 +77,14 @@ export function TurnSettingsSummary({ metadata }: { metadata: unknown }) {
   );
 }
 
-export function AgentClassifierTraceCard({ metadata }: { metadata: unknown }) {
+export function AgentClassifierTraceCard({
+  metadata,
+  isAdmin = true,
+}: {
+  metadata: unknown;
+  isAdmin?: boolean;
+}) {
+  if (!isAdmin) return null;
   const trace = classifierTraceFromMetadata(metadata);
   const plan = agentPlanFromMetadata(metadata);
   if (!trace && !plan) return null;
