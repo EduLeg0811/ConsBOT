@@ -97,8 +97,8 @@ export const DEFAULT_DEPTH_WORD_TARGETS: Record<ResponseDepthId, number> = {
 };
 
 export const DEPTH_WORD_STEP = 50;
-export const MIN_TARGET_WORDS = 100;
-export const MAX_TARGET_WORDS = 5000;
+export const MIN_TARGET_WORDS = 200;
+export const MAX_TARGET_WORDS = 4000;
 
 export function verbosityForDepth(depth: ResponseDepthId): TextVerbosity {
   return RESPONSE_DEPTHS.find((item) => item.id === depth)?.verbosity ?? "medium";
