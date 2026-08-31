@@ -249,4 +249,29 @@ describe("agent planner", () => {
       origin: "luna",
     });
   });
+
+  it("responde em rota full e anexa o pill do ICGE para perguntas sobre eventos e instituições", async () => {
+    classifierResponse({
+      actions: [{ intent: "acervo_icge", term: "", field: "", book: "" }],
+      route: "full",
+      confidence: 0.95,
+      reason: "eventos_conscienciologia",
+      answer: "",
+    });
+
+    await expect(
+      planAgent(context("onde encontro palestras e cursos das instituições da Conscienciologia?")),
+    ).resolves.toMatchObject({
+      route: "full",
+      actions: [
+        {
+          id: "acervo_icge",
+          href: "https://www.icge.org.br",
+          kind: "open-url",
+          label: "Mais informações no site do ICGE",
+        },
+      ],
+      origin: "luna",
+    });
+  });
 });

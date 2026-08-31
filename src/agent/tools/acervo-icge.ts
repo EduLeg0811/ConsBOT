@@ -2,20 +2,23 @@ import { AGENT_TARGETS } from "@/agent/config";
 import { BIBLIO_CONTEXT, BOOK_TARGET, SEARCH_INTENT, VERBETE_TARGET } from "@/agent/tools/lib/text";
 import type { AgentTool } from "@/agent/types";
 
-/** Padrões locais de detecção sobre o acervo da Conscienciologia / ICGE. */
+/** Padrões locais de detecção sobre o acervo e eventos da Conscienciologia / ICGE. */
 const ACERVO_PATTERNS = [
   /\bacervo\w*\s+(?:d[aeo]\s+)?conscienciologia\b/iu,
   /\b(?:acervo\s+geral|acervo\s+hist[óo]rico|acervo\s+do\s+ceaec|acervo\s+do\s+icge|acervo\s+holotec[áa]rio)\b/iu,
   /\b(?:holoteca|hemeroteca|gibiteca|filacoteca|artefatos?\s+hist[óo]ricos?)\b/iu,
   /\b(?:informa[çc][õo]es?\s+sobre\s+o\s+acervo|conserva[çc][ãa]o\s+do\s+acervo)\b/iu,
+  /\b(?:eventos?|palestras?|cursos?|v[íi]deos?)\s+(?:da|de|sobre)?\s*conscienciologia\b/iu,
+  /\b(?:institui[çc][õo]es?\s+consciencioc[êe]ntricas?|\bICs\b|institui[çc][õo]es?\s+da\s+conscienciologia)\b/iu,
   /\b(?:site\s+d[oe]\s+)?icge\b/iu,
 ];
 
-/** Encaminhamento para o site do ICGE (informações sobre o acervo da Conscienciologia).
+/** Encaminhamento para o site do ICGE (informações sobre o acervo e eventos da Conscienciologia).
  *
  * Acionado quando o usuário pergunta alguma informação sobre o acervo da
- * Conscienciologia, acervo holotecário, artefatos ou arquivo histórico que não
- * seja busca de termos em livros/verbetes nem bibliografia.
+ * Conscienciologia (holoteca, artefatos, arquivo histórico) ou sobre eventos
+ * da Conscienciologia (palestras, cursos, vídeos, instituições, ICs, etc.)
+ * que não seja busca textual de termos em livros/verbetes nem bibliografia.
  *
  * A LLM deve responder normalmente na rota full, com o pill exibido.
  */
@@ -25,8 +28,8 @@ export const acervoIcge: AgentTool = {
 
   describe: (english) =>
     english
-      ? "acervo_icge — the user asks for information about the Conscientiology collection/archive (holotheca, historical collection, artifacts, physical archive, preservation, ICGE) that is NOT a direct term search in books or verbetes, nor a bibliographic reference request. The main model should answer normally (route full), accompanied by this action to display the pill linking to the ICGE website."
-      : "acervo_icge — o usuário pergunta alguma informação sobre o acervo da Conscienciologia (holoteca, acervo histórico, artefatos, arquivo físico, conservação documental, ICGE) que NÃO seja busca textual em livros ou verbetes nem pedido de referências bibliográficas. O modelo principal deve responder normalmente (route full), acompanhado desta ação para exibir o pill com o link do site do ICGE.",
+      ? "acervo_icge — the user asks for information about the Conscientiology collection/archive (holotheca, historical collection, artifacts, physical archive, preservation) OR about Conscientiology events (lectures, courses, videos, institutions, ICs, etc.) that is NOT a direct term search in books or verbetes, nor a bibliographic reference request. The main model should answer normally (route full), accompanied by this action to display the pill linking to the ICGE website."
+      : "acervo_icge — o usuário pergunta alguma informação sobre o acervo da Conscienciologia (holoteca, acervo histórico, artefatos, arquivo físico, conservação documental) OU sobre eventos da Conscienciologia (palestras, cursos, vídeos, instituições, ICs, etc.) que NÃO seja busca textual em livros ou verbetes nem pedido de referências bibliográficas. O modelo principal deve responder normalmente (route full), acompanhado desta ação para exibir o pill com o link do site do ICGE.",
 
   rule: ({ userText }) => {
     // Não interfere em buscas literais em livros ou verbetes nem em bibliografia
@@ -60,8 +63,8 @@ export const acervoIcge: AgentTool = {
       {
         source: "ICGE",
         snippet: host.english
-          ? "For more information about the Conscientiology collection and archives, visit [ICGE](https://www.icge.org.br)."
-          : "Para mais informações sobre o acervo da Conscienciologia, visite o site do [ICGE](https://www.icge.org.br).",
+          ? "For more information about the Conscientiology collection, archives and events, visit [ICGE](https://www.icge.org.br)."
+          : "Para mais informações sobre o acervo e eventos da Conscienciologia, visite o site do [ICGE](https://www.icge.org.br).",
       },
     ],
   }),

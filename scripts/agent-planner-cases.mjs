@@ -161,6 +161,9 @@ export const CASES = [
   { ficha: 6, q: "onde fica o acervo histórico e a holoteca?", expect: ["acervo_icge"] },
   { ficha: 6, q: "quais artefatos fazem parte do acervo?", expect: ["acervo_icge"] },
   { ficha: 6, q: "informações sobre a conservação do acervo documental", expect: ["acervo_icge"] },
+  { ficha: 6, q: "quais são as instituições da Conscienciologia (ICs)?", expect: ["acervo_icge"] },
+  { ficha: 6, q: "onde posso assistir a palestras e vídeos da Conscienciologia?", expect: ["acervo_icge"] },
+  { ficha: 6, q: "onde encontrar a agenda de cursos e eventos da Conscienciologia?", expect: ["acervo_icge"] },
 
   // ── Geral · uso comum, nenhuma ação esperada ─────────────────────────────
   { ficha: "geral", q: "Como iniciar a prática da tenepes?", expect: [] },
