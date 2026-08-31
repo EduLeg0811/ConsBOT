@@ -91,9 +91,9 @@ export const RESPONSE_DEPTHS: ResponseDepthDefinition[] = [
 ];
 
 export const DEFAULT_DEPTH_WORD_TARGETS: Record<ResponseDepthId, number> = {
-  synthetic: 500,
-  balanced: 1000,
-  complete: 2000,
+  synthetic: 300,
+  balanced: 600,
+  complete: 1200,
 };
 
 export const DEPTH_WORD_STEP = 50;
@@ -108,6 +108,19 @@ export function normalizeDepthWordTarget(depth: ResponseDepthId, value: number):
   if (!Number.isFinite(value) || value <= 0) return DEFAULT_DEPTH_WORD_TARGETS[depth];
   const clamped = Math.min(MAX_TARGET_WORDS, Math.max(MIN_TARGET_WORDS, value));
   return Math.round(clamped / DEPTH_WORD_STEP) * DEPTH_WORD_STEP;
+}
+
+
+export const CONSCIENTIOLOGICAL_WORD_OFFSET = 200;
+
+export function targetWordsForSettings(settings: ChatSettings): number {
+  const base = normalizeDepthWordTarget(
+    settings.responseDepth,
+    settings.depthWordTargets[settings.responseDepth],
+  );
+  return settings.responseFormat === "conscienciological"
+    ? base + CONSCIENTIOLOGICAL_WORD_OFFSET
+    : base;
 }
 
 export type ProfileId = "preceptor" | "tutor" | "escritor" | "introdutor";
@@ -395,17 +408,6 @@ export function settingsForPublicUser(settings: ChatSettings): ChatSettings {
   };
 }
 
-export const CONSCIENTIOLOGICAL_WORD_OFFSET = 400;
-
-export function targetWordsForSettings(settings: ChatSettings): number {
-  const base = normalizeDepthWordTarget(
-    settings.responseDepth,
-    settings.depthWordTargets[settings.responseDepth],
-  );
-  return settings.responseFormat === "conscienciological"
-    ? base + CONSCIENTIOLOGICAL_WORD_OFFSET
-    : base;
-}
 
 export function buildSystemPrompt(settings: ChatSettings): string {
   const modules = [
