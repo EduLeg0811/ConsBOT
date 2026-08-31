@@ -91,9 +91,9 @@ export const RESPONSE_DEPTHS: ResponseDepthDefinition[] = [
 ];
 
 export const DEFAULT_DEPTH_WORD_TARGETS: Record<ResponseDepthId, number> = {
-  synthetic: 300,
-  balanced: 600,
-  complete: 1200,
+  synthetic: 400,
+  balanced: 800,
+  complete: 1600,
 };
 
 export const DEPTH_WORD_STEP = 50;
