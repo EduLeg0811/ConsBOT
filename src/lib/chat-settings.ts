@@ -91,14 +91,14 @@ export const RESPONSE_DEPTHS: ResponseDepthDefinition[] = [
 ];
 
 export const DEFAULT_DEPTH_WORD_TARGETS: Record<ResponseDepthId, number> = {
-  synthetic: 600,
-  balanced: 1200,
-  complete: 2400,
+  synthetic: 300,
+  balanced: 600,
+  complete: 1200,
 };
 
-export const DEPTH_WORD_STEP = 50;
-export const MIN_TARGET_WORDS = 200;
-export const MAX_TARGET_WORDS = 4000;
+export const DEPTH_WORD_STEP = 100;
+export const MIN_TARGET_WORDS = 100;
+export const MAX_TARGET_WORDS = 2400;
 
 export function verbosityForDepth(depth: ResponseDepthId): TextVerbosity {
   return RESPONSE_DEPTHS.find((item) => item.id === depth)?.verbosity ?? "medium";
@@ -269,7 +269,7 @@ export const PROFILE_LLM_DEFAULTS: Record<ProfileId, ProfileLlmDefaults> = {
     model: "gpt-5.6-terra",
     reasoningEffort: "low",
     responseFormat: "conscienciological",
-    responseDepth: "balanced",
+    responseDepth: "synthetic",
     vectorStoreId: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
     vectorMaxResults: 10,
   },
@@ -285,7 +285,7 @@ export const PROFILE_LLM_DEFAULTS: Record<ProfileId, ProfileLlmDefaults> = {
     model: "gpt-5.6-sol",
     reasoningEffort: "high",
     responseFormat: "conscienciological",
-    responseDepth: "complete",
+    responseDepth: "balanced",
     vectorStoreId: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
     vectorMaxResults: 20,
   },
@@ -305,8 +305,8 @@ export interface ChatSettings extends ProfileLlmDefaults {
 
 /** Limites do complemento documental exibido no painel de citações. */
 export const SEMANTIC_CONTEXT_RESULTS_MIN = 1;
-export const SEMANTIC_CONTEXT_RESULTS_MAX = 200;
-export const SEMANTIC_CONTEXT_RESULTS_DEFAULT = 8;
+export const SEMANTIC_CONTEXT_RESULTS_MAX = 100;
+export const SEMANTIC_CONTEXT_RESULTS_DEFAULT = 10;
 
 export function normalizeSemanticContextLimit(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
