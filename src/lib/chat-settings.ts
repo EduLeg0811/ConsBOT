@@ -76,7 +76,7 @@ export const RESPONSE_DEPTHS: ResponseDepthDefinition[] = [
     id: "synthetic",
     label: "Sintética",
     description: "Resposta concisa, centrada no essencial",
-    minWords: 100,
+    minWords: 200,
     maxWords: 400,
     verbosity: "low",
   },
@@ -93,7 +93,7 @@ export const RESPONSE_DEPTHS: ResponseDepthDefinition[] = [
     label: "Completa",
     description: "Tratamento aprofundado e abrangente",
     minWords: 800,
-    maxWords: 2000,
+    maxWords: 2400,
     verbosity: "high",
   },
 ];

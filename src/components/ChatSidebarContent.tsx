@@ -138,6 +138,13 @@ export function ChatSidebarContent({
     if (editingId) editRef.current?.focus();
   }, [editingId]);
 
+  useEffect(() => {
+    if (!isAdmin) {
+      if (logsEnabled) setLogsEnabled(false);
+      if (tab === "logs") setTab("chats");
+    }
+  }, [isAdmin, logsEnabled, tab]);
+
   const startEdit = (thread: ChatThread) => {
     setEditingId(thread.id);
     setDraftTitle(thread.title);
@@ -196,7 +203,7 @@ export function ChatSidebarContent({
               description: "Audite as chamadas e respostas da LLM.",
             },
           ]
-            .filter(({ id }) => id !== "logs" || logsEnabled)
+            .filter(({ id }) => id !== "logs" || (isAdmin && logsEnabled))
             .map(({ id, label, icon: Icon, description }) => {
               const selected = tab === id;
               return (
@@ -336,7 +343,7 @@ export function ChatSidebarContent({
           onVectorStoreChange={(vectorStoreId) => onSettingsChange({ ...settings, vectorStoreId })}
           isAdmin={isAdmin}
         />
-      ) : (
+      ) : tab === "logs" && isAdmin ? (
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
           <div className="mb-3 flex items-start justify-between gap-3 px-1 pt-1">
             <div>
@@ -516,9 +523,9 @@ export function ChatSidebarContent({
             </div>
           )}
         </div>
-      )}
+      ) : null}
 
-      {tab === "settings" ? (
+      {tab === "settings" && (citationsPanelAvailable || isAdmin) ? (
         <TooltipProvider delayDuration={250}>
           <div className="flex justify-end gap-1 px-3 pb-2">
             {citationsPanelAvailable ? (
@@ -543,24 +550,26 @@ export function ChatSidebarContent({
                 </TooltipContent>
               </Tooltip>
             ) : null}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  aria-label={logsEnabled ? "Ocultar painel de Logs" : "Habilitar painel de Logs"}
-                  onClick={() => setLogsEnabled((enabled) => !enabled)}
-                >
-                  {logsEnabled ? <EyeOff /> : <Eye />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-52 bg-popover text-center text-[11px] leading-snug text-popover-foreground">
-                {logsEnabled
-                  ? "Ocultar o painel de auditoria de Logs."
-                  : "Habilitar o painel de auditoria de Logs."}
-              </TooltipContent>
-            </Tooltip>
+            {isAdmin ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    aria-label={logsEnabled ? "Ocultar painel de Logs" : "Habilitar painel de Logs"}
+                    onClick={() => setLogsEnabled((enabled) => !enabled)}
+                  >
+                    {logsEnabled ? <EyeOff /> : <Eye />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-52 bg-popover text-center text-[11px] leading-snug text-popover-foreground">
+                  {logsEnabled
+                    ? "Ocultar o painel de auditoria de Logs."
+                    : "Habilitar o painel de auditoria de Logs."}
+                </TooltipContent>
+              </Tooltip>
+            ) : null}
           </div>
         </TooltipProvider>
       ) : null}
