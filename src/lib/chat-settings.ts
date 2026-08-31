@@ -91,9 +91,9 @@ export const RESPONSE_DEPTHS: ResponseDepthDefinition[] = [
 ];
 
 export const DEFAULT_DEPTH_WORD_TARGETS: Record<ResponseDepthId, number> = {
-  synthetic: 400,
-  balanced: 800,
-  complete: 1600,
+  synthetic: 600,
+  balanced: 1200,
+  complete: 2400,
 };
 
 export const DEPTH_WORD_STEP = 50;
@@ -279,13 +279,13 @@ export const PROFILE_LLM_DEFAULTS: Record<ProfileId, ProfileLlmDefaults> = {
     responseFormat: "conscienciological",
     responseDepth: "complete",
     vectorStoreId: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
-    vectorMaxResults: 20,
+    vectorMaxResults: 15,
   },
   preceptor: {
     model: "gpt-5.6-sol",
     reasoningEffort: "high",
     responseFormat: "conscienciological",
-    responseDepth: "balanced",
+    responseDepth: "complete",
     vectorStoreId: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
     vectorMaxResults: 20,
   },
