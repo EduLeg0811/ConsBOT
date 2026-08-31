@@ -83,20 +83,28 @@ export const searchVerbete: AgentTool = {
     english
       ? [
           "search_verbete — same as search_book, but in the VERBETES of the Encyclopedia of Conscientiology: the user says verbete, verbetes, Enciclopédia or Definologia. When they do not say where to look, return both search_book and search_verbete. term holds only the word or expression being looked for.",
+          "Use search_verbete strictly when the user asks to consult, search or locate information inside verbetes.",
           "Do NOT use it when they want the content of a verbete they name themselves: «What does the verbete “X” say?», «Summarise the verbete “X”» and «Compare the verbetes “X” and “Y”» are requests for explanation, and the answer does not depend on a lookup.",
+          "Do NOT use it for verbete writing criteria, applying or adjusting text to the verbete form, verbete guidelines, or questions about Encyclossapiens (use encyclossapiens instead).",
           "In this intent, field says which column to SEARCH the term in — not what the user wants to find out. titulo when the term is the name of a verbete; autor when the term is a person name; especialidade when the term is an area. Leave field empty to search the Definologia text, which is the common case.",
           "Beware the inversion: in «Who wrote the verbete “Sursum Conscientia”?» the term is Sursum Conscientia and field is titulo — the author is the answer, and it comes back in the search result. field would be autor only if the term were the person name, as in «which verbetes did Waldo Vieira write?». In the other three intents field is always empty.",
           "Here too the term is not always quoted, and the absence of quotes changes nothing.",
         ].join("\n")
       : [
           "search_verbete — igual a search_book, mas nos VERBETES da Enciclopédia da Conscienciologia: o usuário diz verbete, verbetes, Enciclopédia ou Definologia. Quando ele não disser onde procurar, devolva as duas: search_book e search_verbete. Em term vai apenas a palavra ou expressão procurada.",
+          "Use search_verbete exclusivamente quando o usuário pedir para consultar, buscar ou localizar alguma informação nos verbetes.",
           "NÃO use quando ele quer o conteúdo de um verbete que ele mesmo nomeia: «Sobre o que o verbete “X” fala?», «Resuma o verbete “X”», «Discuta o verbete “X”» e «Compare os verbetes “X” e “Y”» são pedidos de explicação, e a resposta não depende de busca.",
+          "NÃO use para critérios de escrita do verbete, aplicar ao texto ou ajustar texto à forma dos verbetes, diretrizes dos verbetes ou dúvidas sobre a Encyclossapiens (use encyclossapiens para esses casos).",
           "Nesta intenção, field diz em qual coluna PROCURAR o term — não o que o usuário quer descobrir. titulo quando o term é o nome de um verbete; autor quando o term é o nome de uma pessoa; especialidade quando o term é uma área. Deixe field vazio para procurar no texto da Definologia, que é o caso comum.",
           "Cuidado com a inversão: em «Quem é o autor do verbete “Sursum Conscientia”?» o term é Sursum Conscientia e field é titulo — o autor é a resposta, e vem no resultado da busca. field seria autor só se o term fosse o nome da pessoa, como em «que verbetes o Waldo Vieira escreveu?». Nas outras três intenções field é sempre vazio.",
           "Aqui também o termo procurado nem sempre vem entre aspas, e a falta delas não muda nada.",
         ].join("\n"),
 
   rule: ({ userText }) => {
+    if (/\b(?:encyclossapiens|crit[ée]rios?\s+(?:de\s+)?escrita|diretrizes?\s+(?:d[oe]s?\s+)?verbet\w*|(?:aplicar|ajustar|adaptar|formatar)\s+.*(?:[àa]\s+)?forma\s+(?:d[oe]s?\s+)?verbet\w*)\b/iu.test(userText)) {
+      return null;
+    }
+
     // Perguntar pelo autor ou pela especialidade é pedido de busca tanto
     // quanto «localize»; só não traz verbo.
     const byField = VERBETE_TARGET.test(userText) && FIELD_QUERY.test(userText);

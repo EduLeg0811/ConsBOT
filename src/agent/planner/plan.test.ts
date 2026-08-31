@@ -178,4 +178,75 @@ describe("agent planner", () => {
       answer: "As fontes de consulta atualmente carregadas estão listadas abaixo.",
     });
   });
+
+  it("retorna ação e pill para encyclossapiens quando solicitado critérios ou diretrizes", async () => {
+    classifierResponse({
+      actions: [{ intent: "encyclossapiens", term: "", field: "", book: "" }],
+      route: "direct",
+      confidence: 0.95,
+      reason: "verbete_criteria",
+      answer: "Sugere-se visitar a página da Encyclossapiens para obter informações completas sobre os verbetes.",
+    });
+
+    await expect(planAgent(context("quais os critérios de escrita do verbete?"))).resolves.toMatchObject({
+      route: "direct",
+      actions: [
+        {
+          id: "encyclossapiens",
+          href: "https://encyclossapiens.org/",
+          kind: "open-url",
+          label: "Encyclossapiens",
+        },
+      ],
+      origin: "luna",
+      answer: "Sugere-se visitar a página da Encyclossapiens para obter informações completas sobre os verbetes.",
+    });
+  });
+
+  it("mantém a ação search_verbete para cons-ia.org quando busca termos nos verbetes", async () => {
+    classifierResponse({
+      actions: [{ intent: "search_verbete", term: "consciex", field: "", book: "" }],
+      route: "direct",
+      confidence: 0.92,
+      reason: "search_verbete",
+      answer: "",
+    });
+
+    await expect(planAgent(context("localize consciex nos verbetes"))).resolves.toMatchObject({
+      route: "direct",
+      actions: [
+        {
+          id: "search_verbete",
+          href: "https://cons-ia.org/index_search_verb.html?q=consciex",
+          kind: "open-url",
+        },
+      ],
+      origin: "luna",
+    });
+  });
+
+  it("responde em rota full e anexa o pill do ICGE para perguntas sobre o acervo", async () => {
+    classifierResponse({
+      actions: [{ intent: "acervo_icge", term: "", field: "", book: "" }],
+      route: "full",
+      confidence: 0.94,
+      reason: "acervo_conscienciologia",
+      answer: "",
+    });
+
+    await expect(
+      planAgent(context("como funciona o acervo histórico da Conscienciologia?")),
+    ).resolves.toMatchObject({
+      route: "full",
+      actions: [
+        {
+          id: "acervo_icge",
+          href: "https://www.icge.org.br",
+          kind: "open-url",
+          label: "Mais informações no site do ICGE",
+        },
+      ],
+      origin: "luna",
+    });
+  });
 });

@@ -47,6 +47,12 @@ function actionButtonAnswer(english: boolean): string {
     : "Clique nos botões abaixo para expandir sua pesquisa.";
 }
 
+function encyclossapiensAnswer(english: boolean): string {
+  return english
+    ? "To obtain complete information about verbetes, their writing criteria and guidelines, visit the Encyclossapiens page below."
+    : "Para obter informações completas sobre os verbetes, seus critérios de escrita e diretrizes, visite a página da Encyclossapiens indicada abaixo.";
+}
+
 function sourceListIntro(english: boolean): string {
   return english
     ? "The currently loaded consultation sources are listed below."
@@ -300,6 +306,8 @@ async function requestPlan(ctx: AgentContext): Promise<AgentPlan | typeof FAILED
         route,
         answer: actions.some((action) => action.id === "list_sources")
           ? sourceListIntro(english)
+          : actions.some((action) => action.id === "encyclossapiens")
+          ? (answer || encyclossapiensAnswer(english))
           : actionButtonAnswer(english),
         confidence,
         reason,

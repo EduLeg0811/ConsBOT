@@ -149,6 +149,19 @@ export const CASES = [
   { ficha: 4, q: "Faça um cotejo entre “Cosmoética” e “Paradireito”", expect: [] },
   { ficha: 4, q: "Qual a diferença entre “Cosmovisão” e “Cosmoconsciência”", expect: [] },
 
+  // ── Ficha 5 · encyclossapiens ────────────────────────────────────────────
+  { ficha: 5, q: "quais os critérios de escrita do verbete?", expect: ["encyclossapiens"] },
+  { ficha: 5, q: "como aplicar ao texto a forma dos verbetes?", expect: ["encyclossapiens"] },
+  { ficha: 5, q: "peço para ajustar meu texto à forma dos verbetes", expect: ["encyclossapiens"] },
+  { ficha: 5, q: "quais são as diretrizes dos verbetes da Enciclopédia?", expect: ["encyclossapiens"] },
+  { ficha: 5, q: "o que é a Encyclossapiens?", expect: ["encyclossapiens"] },
+
+  // ── Ficha 6 · acervo_icge ────────────────────────────────────────────────
+  { ficha: 6, q: "como é organizado o acervo da Conscienciologia?", expect: ["acervo_icge"] },
+  { ficha: 6, q: "onde fica o acervo histórico e a holoteca?", expect: ["acervo_icge"] },
+  { ficha: 6, q: "quais artefatos fazem parte do acervo?", expect: ["acervo_icge"] },
+  { ficha: 6, q: "informações sobre a conservação do acervo documental", expect: ["acervo_icge"] },
+
   // ── Geral · uso comum, nenhuma ação esperada ─────────────────────────────
   { ficha: "geral", q: "Como iniciar a prática da tenepes?", expect: [] },
   { ficha: "geral", q: "Explique o paradigma consciencial em termos simples.", expect: [] },

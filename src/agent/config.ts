@@ -53,6 +53,8 @@ export const AGENT_INTENTS = [
   "bibliografia_livros",
   "bibliografia_verbetes",
   "consulta_dicionarios",
+  "encyclossapiens",
+  "acervo_icge",
   "list_sources",
 ] as const;
 
@@ -87,6 +89,13 @@ export const AGENT_TARGETS: Record<AgentIntentId, string> = {
   ),
   consulta_dicionarios: stripQuery(
     String(import.meta.env.VITE_LEXICONS_URL || "").trim() || "https://lexicons.cons-ia.org/",
+  ),
+  encyclossapiens: stripQuery(
+    String(import.meta.env.VITE_ENCYCLOSSAPIENS_URL || "").trim() ||
+      "https://encyclossapiens.org/",
+  ),
+  acervo_icge: stripQuery(
+    String(import.meta.env.VITE_ICGE_URL || "").trim() || "https://www.icge.org.br",
   ),
   list_sources: "#",
 };

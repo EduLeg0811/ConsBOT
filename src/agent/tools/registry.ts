@@ -1,6 +1,8 @@
+import { acervoIcge } from "@/agent/tools/acervo-icge";
 import { bibliografia } from "@/agent/tools/bibliografia";
 import { bibliografiaVerbetes } from "@/agent/tools/bibliografia-verbetes";
 import { dicionarios } from "@/agent/tools/dicionarios";
+import { encyclossapiens } from "@/agent/tools/encyclossapiens";
 import { listSources } from "@/agent/tools/list-sources";
 import { searchBook } from "@/agent/tools/search-book";
 import { searchVerbete } from "@/agent/tools/search-verbete";
@@ -27,6 +29,8 @@ export const AGENT_TOOLS: AgentTool[] = [
   bibliografia,
   bibliografiaVerbetes,
   dicionarios,
+  encyclossapiens,
+  acervoIcge,
   listSources,
 ];
 
