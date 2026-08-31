@@ -57,7 +57,7 @@ import { fetchSemanticIndexes, type SemanticIndex } from "@/lib/semantic-context
 type Props = {
   value: ChatSettings;
   onChange: (settings: ChatSettings) => void;
-  /** Com ACCESS_LEVEL=0 o painel mostra perfil, aprofundamento e formato.
+  /** Com ACCESS_LEVEL=0 o painel mostra perfil e formato.
    *  Os parâmetros técnicos ocultos vêm do preset do perfil. */
   isAdmin: boolean;
 };
@@ -546,42 +546,42 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
         </div>
       </SettingsGroup>
 
-      <SettingsGroup
-        icon={Gauge}
-        title="Aprofundamento"
-        description="Controle a extensão e o nível de detalhe esperado em cada resposta."
-      >
-        <div className="space-y-2">
-          <Label>Aprofundamento</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {RESPONSE_DEPTHS.map((depth) => {
-              const selected = draft.responseDepth === depth.id;
-              const target = draft.depthWordTargets[depth.id];
-              return (
-                <button
-                  className={
-                    selected
-                      ? "rounded-lg border border-primary bg-primary/8 px-2 py-2 text-center shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]"
-                      : "rounded-lg border border-border bg-card/90 px-2 py-2 text-center transition-colors hover:bg-primary/5"
-                  }
-                  key={depth.id}
-                  type="button"
-                  title={depth.description}
-                  onClick={() => setDraft(withResponseDepth(draft, depth.id))}
-                >
-                  <span className="block text-xs font-medium">{depth.label}</span>
-                  <span className="mt-0.5 block text-[10px] tabular-nums text-muted-foreground">
-                    ~{target.toLocaleString("pt-BR")} palavras
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            Define a extensão e o nível de detalhe da resposta.
-          </p>
+      {isAdmin ? (
+        <SettingsGroup
+          icon={Gauge}
+          title="Aprofundamento"
+          description="Controle a extensão e o nível de detalhe esperado em cada resposta."
+        >
+          <div className="space-y-2">
+            <Label>Aprofundamento</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {RESPONSE_DEPTHS.map((depth) => {
+                const selected = draft.responseDepth === depth.id;
+                const target = draft.depthWordTargets[depth.id];
+                return (
+                  <button
+                    className={
+                      selected
+                        ? "rounded-lg border border-primary bg-primary/8 px-2 py-2 text-center shadow-[0_2px_8px_-5px_rgba(25,70,50,0.32)]"
+                        : "rounded-lg border border-border bg-card/90 px-2 py-2 text-center transition-colors hover:bg-primary/5"
+                    }
+                    key={depth.id}
+                    type="button"
+                    title={depth.description}
+                    onClick={() => setDraft(withResponseDepth(draft, depth.id))}
+                  >
+                    <span className="block text-xs font-medium">{depth.label}</span>
+                    <span className="mt-0.5 block text-[10px] tabular-nums text-muted-foreground">
+                      ~{target.toLocaleString("pt-BR")} palavras
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Define a extensão e o nível de detalhe da resposta.
+            </p>
 
-          {isAdmin ? (
             <div className="rounded-xl border border-border/80 bg-secondary/35 p-3">
               <p className="mb-2 text-[11px] font-medium text-foreground">Metas desta sessão</p>
               <div className="grid grid-cols-3 gap-2">
@@ -616,9 +616,9 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
                 Passo de {DEPTH_WORD_STEP} palavras; o prompt aceita variação aproximada de 20%.
               </p>
             </div>
-          ) : null}
-        </div>
-      </SettingsGroup>
+          </div>
+        </SettingsGroup>
+      ) : null}
 
       <SettingsGroup
         icon={Brain}
