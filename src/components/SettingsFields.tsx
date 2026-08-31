@@ -32,6 +32,8 @@ import {
   isEnglishVectorStore,
   DEFAULT_SETTINGS,
   DEPTH_WORD_STEP,
+  MAX_TARGET_WORDS,
+  MIN_TARGET_WORDS,
   MODELS,
   normalizeDepthWordTarget,
   normalizeSemanticContextLimit,
@@ -44,6 +46,7 @@ import {
   RESPONSE_DEPTHS,
   SEMANTIC_CONTEXT_RESULTS_MAX,
   SEMANTIC_CONTEXT_RESULTS_MIN,
+  targetWordsForSettings,
   withProfile,
   withResponseDepth,
   withResponseFormat,
@@ -558,7 +561,7 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
             <div className="grid grid-cols-3 gap-2">
               {RESPONSE_DEPTHS.map((depth) => {
                 const selected = draft.responseDepth === depth.id;
-                const target = draft.depthWordTargets[depth.id];
+                const target = targetWordsForSettings({ ...draft, responseDepth: depth.id });
                 return (
                   <button
                     className={
@@ -595,8 +598,8 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
                       className="h-8 bg-card px-2 text-xs tabular-nums"
                       id={`depth-${depth.id}`}
                       type="number"
-                      min={depth.minWords}
-                      max={depth.maxWords}
+                      min={MIN_TARGET_WORDS}
+                      max={MAX_TARGET_WORDS}
                       step={DEPTH_WORD_STEP}
                       value={draft.depthWordTargets[depth.id]}
                       onChange={(event) => {

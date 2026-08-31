@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { normalizeAgentSettings } from "@/agent";
 import {
+  CONSCIENTIOLOGICAL_WORD_OFFSET,
   DEFAULT_SETTINGS,
+  buildSystemPrompt,
   normalizeSemanticContextLimit,
   settingsForProfile,
   settingsForPublicUser,
+  targetWordsForSettings,
   withProfile,
 } from "@/lib/chat-settings";
 
@@ -73,4 +76,26 @@ describe("chat settings", () => {
   it("normaliza conversas antigas para a apresentação Citações do Agent", () => {
     expect(normalizeAgentSettings({ enabled: true, prompt: "" }).presentation).toBe("citations");
   });
+
+  it("acrescenta 400 palavras à meta quando o formato for conscienciological", () => {
+    expect(CONSCIENTIOLOGICAL_WORD_OFFSET).toBe(400);
+
+    const chatGptSettings = {
+      ...DEFAULT_SETTINGS,
+      responseFormat: "chatgpt" as const,
+      responseDepth: "synthetic" as const,
+    };
+    expect(targetWordsForSettings(chatGptSettings)).toBe(500);
+
+    const consSettings = {
+      ...DEFAULT_SETTINGS,
+      responseFormat: "conscienciological" as const,
+      responseDepth: "synthetic" as const,
+    };
+    expect(targetWordsForSettings(consSettings)).toBe(900);
+
+    const prompt = buildSystemPrompt(consSettings);
+    expect(prompt).toContain("cerca de 900 palavras");
+  });
 });
+
