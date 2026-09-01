@@ -18,24 +18,14 @@ export type ModelId = (typeof MODELS)[number]["id"];
 
 export const VECTOR_STORES = [
   { id: "none", label: "Nenhuma", description: "Responde sem consultar base RAG." },
-  {
-    id: "vs_6a7f75cd0be48191b3f3960a518c6ff3",
-    label: "CONSTECA",
-    description: "Fontes diversas da Conscienciologia",
-  },
-  {
-    id: "vs_6912908250e4819197e23fe725e04fae",
-    label: "ALLWV",
-    description: "Obras completas de Waldo Vieira",
-  },
-  { id: "vs_69260faaec088191bbcf5e3f29b09b71", label: "ENGLISH", description: "Textos em Inglês" },
+  { id: "vs_6a7f75cd0be48191b3f3960a518c6ff3", label: "CONSTECA", description: "Fontes diversas da Conscienciologia" },
+  { id: "vs_6912908250e4819197e23fe725e04fae", label: "ALLWV", description: "Obras completas de Waldo Vieira" },
+
   { id: "vs_698be4e07c748191b834905ebc7a7da3", label: "LO", description: "Léxico de Ortopensatas" },
-  {
-    id: "vs_68f195fdeda08191815ec795ba1f57ba",
-    label: "EDUNOTES",
-    description: "Mini, cursos, anotações",
-  },
+  { id: "vs_68f195fdeda08191815ec795ba1f57ba", label: "EDUNOTES", description: "Mini, cursos, anotações" },
   { id: "vs_699d09de9ca48191b63fbbd4d195a696", label: "ECWV", description: "Seleta EC de WV" },
+
+  { id: "vs_69260faaec088191bbcf5e3f29b09b71", label: "ENGLISH", description: "Textos em Inglês" },
 ] as const;
 
 export type VectorStoreId = (typeof VECTOR_STORES)[number]["id"];
