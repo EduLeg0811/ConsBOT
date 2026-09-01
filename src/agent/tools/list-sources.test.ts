@@ -7,7 +7,7 @@ import {
   sourceListErrorAnswer,
 } from "@/agent/tools/list-sources";
 
-function context(vectorStoreId = "CONS_LIBRARY"): AgentContext {
+function context(vectorStoreId = "CONSTECA"): AgentContext {
   return {
     userText: "Quais as fontes de consulta você possui?",
     settings: {

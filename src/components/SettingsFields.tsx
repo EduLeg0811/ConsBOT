@@ -323,9 +323,8 @@ function SemanticSourceSettings({
                 aria-expanded={agentSourcesOpen}
               >
                 <ChevronRight
-                  className={`mt-0.5 size-3 shrink-0 text-muted-foreground transition-transform ${
-                    agentSourcesOpen ? "rotate-90" : ""
-                  }`}
+                  className={`mt-0.5 size-3 shrink-0 text-muted-foreground transition-transform ${agentSourcesOpen ? "rotate-90" : ""
+                    }`}
                   aria-hidden="true"
                 />
                 <span>
@@ -404,9 +403,9 @@ function SemanticSourceSettings({
           )}
 
           {(operationMode !== "agent" || agentSourcesOpen) &&
-          !loading &&
-          !error &&
-          selectedIds.length === 0 ? (
+            !loading &&
+            !error &&
+            selectedIds.length === 0 ? (
             <p className="text-[10px] leading-relaxed text-destructive">
               Selecione ao menos uma fonte para usar a recuperação documental.
             </p>
@@ -507,9 +506,9 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
                   <span key={value}>{value}</span>
                 ))}
               </div>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {/*  <p className="text-[11px] leading-relaxed text-muted-foreground">
                 Trechos que a busca RAG devolve por consulta (`max_num_results`).
-              </p>
+              </p> */}
             </div>
           </SettingsGroup>
         </>
@@ -521,7 +520,7 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
         description="Escolha a voz, a postura e o estilo predominantes da resposta."
       >
         <div className="space-y-2">
-          <Label>Perfil</Label>
+          {/*<Label>Perfil</Label>*/}
           <div className="grid grid-cols-2 gap-2">
             {PROFILES.map((profile) => {
               const selected = (draft.profile ?? DEFAULT_SETTINGS.profile) === profile.id;
@@ -544,9 +543,9 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
               );
             })}
           </div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          {/*<p className="text-[11px] leading-relaxed text-muted-foreground">
             Tom e estilo da resposta.
-          </p>
+          </p>*/}
         </div>
       </SettingsGroup>
 
@@ -582,9 +581,9 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
                 );
               })}
             </div>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {/*<p className="text-[11px] leading-relaxed text-muted-foreground">
               Define a extensão e o nível de detalhe da resposta.
-            </p>
+            </p>*/}
 
             <div className="rounded-xl border border-border/80 bg-secondary/35 p-3">
               <p className="mb-2 text-[11px] font-medium text-foreground">Metas desta sessão</p>
@@ -616,9 +615,9 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
                   </div>
                 ))}
               </div>
-              <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+              {/* <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
                 Passo de {DEPTH_WORD_STEP} palavras; o prompt aceita variação aproximada de 20%.
-              </p>
+              </p> */}
             </div>
           </div>
         </SettingsGroup>
@@ -630,7 +629,7 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
         description="Defina a organização e as convenções de apresentação do texto."
       >
         <div className="space-y-2">
-          <Label>Formato da resposta</Label>
+          {/*<Label>Formato da resposta</Label>*/}
           <div className="grid grid-cols-2 gap-2">
             {RESPONSE_FORMATS.map((format) => {
               const selected = draft.responseFormat === format.id;
@@ -653,9 +652,9 @@ export function SettingsFields({ value: draft, onChange: setDraft, isAdmin }: Pr
               );
             })}
           </div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          {/*<p className="text-[11px] leading-relaxed text-muted-foreground">
             Organização e convenções textuais da resposta.
-          </p>
+          </p>*/}
         </div>
       </SettingsGroup>
 
