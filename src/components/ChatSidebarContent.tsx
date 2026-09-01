@@ -80,7 +80,7 @@ export const SIDEBAR_QUICK_LINKS = [
     color: "text-violet-500 dark:text-violet-400",
   },
   {
-    title: "Dicionários",
+    title: "Cosmovisão Léxica",
     url: "https://lexicons.cons-ia.org/",
     icon: BookA,
     color: "text-teal-500 dark:text-teal-400",
@@ -215,7 +215,7 @@ export function ChatSidebarContent({
                       className={cn(
                         "flex-1 gap-2 rounded-full border border-transparent transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                         selected &&
-                          "font-bold text-emerald-600 dark:text-emerald-300 hover:bg-sidebar-accent hover:text-emerald-700 dark:hover:text-emerald-200",
+                        "font-bold text-emerald-600 dark:text-emerald-300 hover:bg-sidebar-accent hover:text-emerald-700 dark:hover:text-emerald-200",
                       )}
                       onClick={() => setTab(id)}
                       aria-label={label === "Fontes" ? "Fontes de consulta" : label}
@@ -645,11 +645,11 @@ function agentDecisionFromLog(log: AuditLog): AgentAuditDecision | null {
     const meta = record.meta as Record<string, unknown>;
     return typeof meta.route === "string"
       ? {
-          route: meta.route,
-          ...(typeof meta.origin === "string" ? { origin: meta.origin } : {}),
-          ...(typeof meta.confidence === "number" ? { confidence: meta.confidence } : {}),
-          ...(Array.isArray(meta.actions) ? { actionCount: meta.actions.length } : {}),
-        }
+        route: meta.route,
+        ...(typeof meta.origin === "string" ? { origin: meta.origin } : {}),
+        ...(typeof meta.confidence === "number" ? { confidence: meta.confidence } : {}),
+        ...(Array.isArray(meta.actions) ? { actionCount: meta.actions.length } : {}),
+      }
       : null;
   }
 
@@ -660,11 +660,11 @@ function agentDecisionFromLog(log: AuditLog): AgentAuditDecision | null {
   const value = decision as Record<string, unknown>;
   return typeof value.route === "string"
     ? {
-        route: value.route,
-        ...(typeof value.origin === "string" ? { origin: value.origin } : {}),
-        ...(typeof value.confidence === "number" ? { confidence: value.confidence } : {}),
-        ...(Array.isArray(value.actions) ? { actionCount: value.actions.length } : {}),
-      }
+      route: value.route,
+      ...(typeof value.origin === "string" ? { origin: value.origin } : {}),
+      ...(typeof value.confidence === "number" ? { confidence: value.confidence } : {}),
+      ...(Array.isArray(value.actions) ? { actionCount: value.actions.length } : {}),
+    }
     : null;
 }
 
