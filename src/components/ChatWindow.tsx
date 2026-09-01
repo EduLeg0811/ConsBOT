@@ -305,6 +305,14 @@ function getMessageText(message: ConsBotUIMessage): string {
     .trim();
 }
 
+function messageHasVisibleContent(message: ConsBotUIMessage): boolean {
+  return message.parts.some(
+    (part) =>
+      (part.type === "text" && part.text.trim().length > 0) ||
+      (part.type === "reasoning" && part.text.trim().length > 0),
+  );
+}
+
 function getFirstLines(text: string, maxLines = 10): string {
   const lines = text.split("\n");
   if (lines.length <= maxLines) return text.trim();
@@ -556,6 +564,69 @@ export function ChatWindow({
   }, [initialMessages, setMessages]);
 
   const isBusy = status === "submitted" || status === "streaming";
+
+  const lastMessage = messages[messages.length - 1];
+  const hasAssistantMessage = lastMessage?.role === "assistant";
+  const hasVisibleAssistantContent = hasAssistantMessage && messageHasVisibleContent(lastMessage);
+  const isAwaitingFirstToken = isBusy && !hasVisibleAssistantContent;
+
+  const [streamWaitStage, setStreamWaitStage] = useState<"initial" | "searching" | "synthesizing">("initial");
+
+  useEffect(() => {
+    if (!isAwaitingFirstToken) {
+      setStreamWaitStage("initial");
+      return;
+    }
+
+    const timer1 = setTimeout(() => {
+      setStreamWaitStage("searching");
+    }, 3500);
+
+    const timer2 = setTimeout(() => {
+      setStreamWaitStage("synthesizing");
+    }, 8000);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, [isAwaitingFirstToken]);
+
+  const thinkingText = useMemo(() => {
+    if (isPreparing) {
+      if (preparationStage === "semantic") {
+        return isEnglish
+          ? "Retrieving complementary sources..."
+          : "Consultando fontes complementares...";
+      }
+      if (preparationStage === "sources") {
+        return isEnglish
+          ? "Loading consultation sources..."
+          : "Carregando fontes de consulta...";
+      }
+      return isEnglish ? "Thinking..." : "Pensando...";
+    }
+
+    const hasVectorStore = vectorStoresFor(settings.vectorStoreId).length > 0;
+
+    if (streamWaitStage === "searching") {
+      return isEnglish
+        ? hasVectorStore
+          ? "Searching knowledge base..."
+          : "Generating response..."
+        : hasVectorStore
+          ? "Consultando base de conhecimento..."
+          : "Elaborando resposta...";
+    }
+
+    if (streamWaitStage === "synthesizing") {
+      return isEnglish ? "Synthesizing response..." : "Sintetizando resposta...";
+    }
+
+    return isEnglish ? "Thinking..." : "Pensando...";
+  }, [isPreparing, preparationStage, isEnglish, settings.vectorStoreId, streamWaitStage]);
+
+  const showPendingShimmer = isPreparing || (isBusy && !hasAssistantMessage);
 
   const changeRef = useRef(onMessagesChange);
   changeRef.current = onMessagesChange;
@@ -1377,6 +1448,7 @@ export function ChatWindow({
                 precedingUser?.role === "user" &&
                 agentPresentationForTurn(precedingUser) === "classic";
               const waitingForThisAssistant = isBusy && messageIndex === messages.length - 1;
+              const hasVisibleContent = messageHasVisibleContent(message);
               const ragStatus =
                 message.role === "user"
                   ? getRagStatus(
@@ -1426,6 +1498,7 @@ export function ChatWindow({
                             <MessageResponse
                               key={`${message.id}-t-${index}`}
                               responseFormat={settings.responseFormat}
+                              isAnimating={waitingForThisAssistant && status === "streaming"}
                             >
                               {text}
                             </MessageResponse>
@@ -1440,6 +1513,11 @@ export function ChatWindow({
                         if (part.type === "source-document") return null;
                         return null;
                       })}
+                      {waitingForThisAssistant && !hasVisibleContent ? (
+                        <Shimmer className="text-sm">
+                          {thinkingText}
+                        </Shimmer>
+                      ) : null}
                     </MessageContent>
                   </Message>
                   {ragStatus ? (
@@ -1481,19 +1559,9 @@ export function ChatWindow({
               );
             })}
 
-            {status === "submitted" || isPreparing ? (
+            {showPendingShimmer ? (
               <Shimmer className="text-sm">
-                {preparationStage === "semantic"
-                  ? isEnglish
-                    ? "Retrieving complementary sources..."
-                    : "Consultando fontes complementares..."
-                  : preparationStage === "sources"
-                    ? isEnglish
-                      ? "Loading consultation sources..."
-                      : "Carregando fontes de consulta..."
-                  : isEnglish
-                    ? "Thinking..."
-                    : "Pensando..."}
+                {thinkingText}
               </Shimmer>
             ) : null}
 
