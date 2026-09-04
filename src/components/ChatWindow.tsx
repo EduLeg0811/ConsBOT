@@ -663,9 +663,9 @@ export function ChatWindow({
     // o texto dela alinharia a pergunta desta rodada com a resposta da anterior.
     const isFresh = Boolean(lastAssistant) && lastAssistant?.id !== baselineAssistantIdRef.current;
     const assistantText = isFresh && lastAssistant ? getMessageText(lastAssistant) : "";
-    const first10Lines = assistantText ? getFirstLines(assistantText, 10) : undefined;
     streamStartedRef.current = false;
     if (pendingAccessLogRef.current) {
+      const agentPills = pendingAgentPillsRef.current || [];
       logFeatureAccess({
         module: "consbot",
         action: pendingAccessLogRef.current.action,
@@ -674,7 +674,14 @@ export function ChatWindow({
         chat_id: pendingAccessLogRef.current.chat_id,
         meta: {
           ...pendingAccessLogRef.current.meta,
-          ...(first10Lines ? { response: first10Lines } : {}),
+          ...(assistantText ? { response: assistantText } : {}),
+          ...(agentPills.length > 0
+            ? {
+                pills: agentPills.map((p) => p.label).join(", "),
+                pills_count: agentPills.length,
+                agent_pills: agentPills,
+              }
+            : {}),
         },
       });
       pendingAccessLogRef.current = null;
@@ -744,6 +751,7 @@ export function ChatWindow({
       preparationAbortRef.current = preparationController;
       try {
         openaiAuditRef.current = null;
+        pendingAgentPillsRef.current = [];
         // Marco desta rodada: a resposta que já está na tela. Enquanto a última
         // resposta for esta, não há nada novo para registrar no painel de logs.
         streamStartedRef.current = false;
@@ -944,7 +952,14 @@ export function ChatWindow({
               agent_route: manualCorpus ? "manual_corpus" : useCorpus ? "corpus" : "direct",
               ...agentAuditMeta(triage),
               ...semanticAuditMeta(semanticContext),
-              response: getFirstLines(directAnswer, 10),
+              response: directAnswer,
+              ...(agentPills.length > 0
+                ? {
+                    pills: agentPills.map((p) => p.label).join(", "),
+                    pills_count: agentPills.length,
+                    agent_pills: agentPills,
+                  }
+                : {}),
             },
           });
           const directMessage: ConsBotUIMessage = {
